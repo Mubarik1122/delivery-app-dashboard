@@ -1,21 +1,25 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Utensils } from 'lucide-react';
+import React, { useState } from "react";
+import { Eye, EyeOff, Mail, Lock, User, Phone, Utensils } from "lucide-react";
 
 interface SignupPageProps {
   onSignup: () => void;
   onSwitchToLogin: () => void;
-  onRoleSelect: (role: 'admin' | 'vendor') => void;
+  onRoleSelect: (role: "admin" | "vendor") => void;
 }
 
-export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: SignupPageProps) {
+export default function SignupPage({
+  onSignup,
+  onSwitchToLogin,
+  onRoleSelect,
+}: SignupPageProps) {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-    role: 'vendor' as 'admin' | 'vendor'
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    role: "vendor" as "admin" | "vendor",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -24,11 +28,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      alert("Passwords do not match");
       return;
     }
     if (!agreeToTerms) {
-      alert('Please agree to the terms and conditions');
+      alert("Please agree to the terms and conditions");
       return;
     }
     // Here you would typically create the account
@@ -37,38 +41,39 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Food Image and Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-orange-50 to-red-50 relative overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: 'url(https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1)'
+            backgroundImage:
+              "url(https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1)",
           }}
         >
           <div className="absolute inset-0 bg-black bg-opacity-20"></div>
         </div>
-        
+
         <div className="relative z-10 flex flex-col justify-center items-center text-center p-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
-              <Utensils className="w-8 h-8 text-white" />
-            </div>
-            <span className="text-4xl font-bold">eFood</span>
+            <img src="\image\logo\logo_main_bg.png" alt="logo"></img>
           </div>
-          
+
           <div className="max-w-md">
             <h1 className="text-5xl font-bold mb-4">
-              Your<br />
-              <span className="text-red-400">Kitchen</span><br />
+              Your
+              <br />
+              <span className="text-red-400">Kitchen</span>
+              <br />
               Your Food....
             </h1>
             <p className="text-xl text-gray-200">
-              Join our platform and start managing your restaurant business today
+              Manage your restaurant business with our comprehensive food
+              management system
             </p>
           </div>
         </div>
@@ -89,20 +94,30 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
 
           {/* Header */}
           <div className="text-center lg:text-right mb-8">
-            <h2 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-2">
+              Create Account
+            </h2>
             <p className="text-gray-600 mb-4">Join eFood Platform</p>
             <div className="text-sm text-gray-500">
-              Want To Create Admin Account? 
-              <button 
-                onClick={() => handleInputChange('role', 'admin')}
-                className={`ml-1 font-medium ${formData.role === 'admin' ? 'text-red-600' : 'text-blue-600 hover:text-blue-700'}`}
+              Want To Create Admin Account?
+              <button
+                onClick={() => handleInputChange("role", "admin")}
+                className={`ml-1 font-medium ${
+                  formData.role === "admin"
+                    ? "text-red-600"
+                    : "text-blue-600 hover:text-blue-700"
+                }`}
               >
                 Admin Signup
               </button>
               <span className="mx-2">|</span>
-              <button 
-                onClick={() => handleInputChange('role', 'vendor')}
-                className={`font-medium ${formData.role === 'vendor' ? 'text-red-600' : 'text-blue-600 hover:text-blue-700'}`}
+              <button
+                onClick={() => handleInputChange("role", "vendor")}
+                className={`font-medium ${
+                  formData.role === "vendor"
+                    ? "text-red-600"
+                    : "text-blue-600 hover:text-blue-700"
+                }`}
               >
                 Vendor Signup
               </button>
@@ -119,11 +134,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => handleInputChange('role', 'admin')}
+                  onClick={() => handleInputChange("role", "admin")}
                   className={`p-3 rounded-lg border-2 transition-all ${
-                    formData.role === 'admin'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    formData.role === "admin"
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
                   }`}
                 >
                   <div className="text-center">
@@ -133,11 +148,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleInputChange('role', 'vendor')}
+                  onClick={() => handleInputChange("role", "vendor")}
                   className={`p-3 rounded-lg border-2 transition-all ${
-                    formData.role === 'vendor'
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    formData.role === "vendor"
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
                   }`}
                 >
                   <div className="text-center">
@@ -159,7 +174,9 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                   <input
                     type="text"
                     value={formData.firstName}
-                    onChange={(e) => handleInputChange('firstName', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("firstName", e.target.value)
+                    }
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     placeholder="John"
                     required
@@ -175,7 +192,9 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                   <input
                     type="text"
                     value={formData.lastName}
-                    onChange={(e) => handleInputChange('lastName', e.target.value)}
+                    onChange={(e) =>
+                      handleInputChange("lastName", e.target.value)
+                    }
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     placeholder="Doe"
                     required
@@ -194,7 +213,7 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   placeholder="john@example.com"
                   required
@@ -212,7 +231,7 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                 <input
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   placeholder="+1 (555) 123-4567"
                   required
@@ -228,9 +247,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   value={formData.password}
-                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("password", e.target.value)
+                  }
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   placeholder="Create a strong password"
                   required
@@ -240,7 +261,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -253,9 +278,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  type={showConfirmPassword ? "text" : "password"}
                   value={formData.confirmPassword}
-                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("confirmPassword", e.target.value)
+                  }
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                   placeholder="Confirm your password"
                   required
@@ -265,7 +292,11 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -280,12 +311,18 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
                 required
               />
               <span className="ml-2 text-sm text-gray-600">
-                I agree to the{' '}
-                <button type="button" className="text-red-600 hover:text-red-700 font-medium">
+                I agree to the{" "}
+                <button
+                  type="button"
+                  className="text-red-600 hover:text-red-700 font-medium"
+                >
                   Terms of Service
-                </button>{' '}
-                and{' '}
-                <button type="button" className="text-red-600 hover:text-red-700 font-medium">
+                </button>{" "}
+                and{" "}
+                <button
+                  type="button"
+                  className="text-red-600 hover:text-red-700 font-medium"
+                >
                   Privacy Policy
                 </button>
               </span>
@@ -302,7 +339,9 @@ export default function SignupPage({ onSignup, onSwitchToLogin, onRoleSelect }: 
 
           {/* Login Link */}
           <div className="mt-6 text-center">
-            <span className="text-sm text-gray-600">Already have an account? </span>
+            <span className="text-sm text-gray-600">
+              Already have an account?{" "}
+            </span>
             <button
               onClick={onSwitchToLogin}
               className="text-sm text-red-600 hover:text-red-700 font-medium"
