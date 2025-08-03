@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Utensils } from "lucide-react";
 import { apiService } from "../services/api";
 
-interface LoginPageProps {
+export interface LoginPageProps {
   onLogin: () => void;
+  onSwitchToSignup: () => void; // <-- Add this line
   onRoleSelect: (role: "admin" | "vendor") => void;
   onForgotPassword: () => void;
   onOTPRequired: (email: string) => void;
@@ -93,7 +94,7 @@ export default function LoginPage({
 
         <div className="relative z-10 flex flex-col justify-center items-center text-center p-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <img src="\public\image\logo\logo_main_bg.png" alt="logo"></img>
+            <img src="\image\logo\logo_main_bg.png" alt="logo"></img>
           </div>
 
           <div className="max-w-md">

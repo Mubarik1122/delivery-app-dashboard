@@ -129,7 +129,7 @@ export default function OTPVerificationPage({
 
         <div className="relative z-10 flex flex-col justify-center items-center text-center p-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <img src="\public\image\logo\logo_main_bg.png" alt="logo"></img>
+            <img src="\image\logo\logo_main_bg.png" alt="logo"></img>
           </div>
 
           <div className="max-w-md">
