@@ -47,7 +47,7 @@ import {
 
 function App() {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [isAuthenticated, setIsAuthenticated] = useState(true); // Set to false for login flow
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Default to false - user must login
   const [authMode, setAuthMode] = useState<
     "login" | "signup" | "forgot-password" | "otp-verification"
   >("login");
@@ -56,6 +56,15 @@ function App() {
   const [showAddDeliveryman, setShowAddDeliveryman] = useState(false);
   const [showAddVendor, setShowAddVendor] = useState(false);
   const [userRole, setUserRole] = useState<"admin" | "vendor">("admin");
+
+  // Check for existing authentication on app load
+  React.useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      // TODO: Optionally verify token with backend
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -69,10 +78,12 @@ function App() {
 
   const handleOTPVerified = (token: string, user: any) => {
     localStorage.setItem("auth_token", token);
-    const userRole = user.role?.toLowerCase();
+    const userRole = user.role.toLowerCase();
     if (userRole === "admin" || userRole === "vendor") {
       setUserRole(userRole as "admin" | "vendor");
     } else {
+      // Handle unexpected roles - default to vendor but could show error
+      console.warn(`Unexpected user role: ${user.role}, defaulting to vendor`);
       setUserRole("vendor");
     }
     setIsAuthenticated(true);
@@ -114,7 +125,7 @@ function App() {
         return (
           <LoginPage
             onLogin={handleLogin}
-            // onSwitchToSignup={() => setAuthMode('signup')}
+            onSwitchToSignup={() => setAuthMode("signup")}
             onRoleSelect={handleRoleSelect}
             onForgotPassword={() => setAuthMode("forgot-password")}
             onOTPRequired={(email) => {
@@ -145,7 +156,7 @@ function App() {
         return (
           <LoginPage
             onLogin={handleLogin}
-            // onSwitchToSignup={() => setAuthMode('signup')}
+            onSwitchToSignup={() => setAuthMode("signup")}
             onRoleSelect={handleRoleSelect}
             onForgotPassword={() => setAuthMode("forgot-password")}
             onOTPRequired={(email) => {

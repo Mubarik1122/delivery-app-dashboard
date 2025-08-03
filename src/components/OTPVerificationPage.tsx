@@ -73,15 +73,11 @@ export default function OTPVerificationPage({
         otp: otpToVerify,
       });
 
-      if (response.success) {
-        if (response.data && response.data.token) {
-          localStorage.setItem("auth_token", response.data.token);
-          onVerified(response.data.token, response.data.user);
-        } else {
-          setError("OTP verified but no authentication token received");
-        }
+      if (response.errorCode === 0 && response.data) {
+        localStorage.setItem("auth_token", response.data.token);
+        onVerified(response.data.token, response.data.user);
       } else {
-        setError(response.message || "Invalid OTP");
+        setError(response.errorMessage || "Invalid OTP");
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
@@ -133,7 +129,7 @@ export default function OTPVerificationPage({
 
         <div className="relative z-10 flex flex-col justify-center items-center text-center p-12 text-white">
           <div className="flex items-center space-x-3 mb-8">
-            <img src="\image\logo\logo_main_bg.png" alt="logo"></img>
+            <img src="\public\image\logo\logo_main_bg.png" alt="logo"></img>
           </div>
 
           <div className="max-w-md">
@@ -151,7 +147,6 @@ export default function OTPVerificationPage({
           </div>
         </div>
       </div>
-
       {/* Right Side - OTP Verification Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="max-w-md w-full">
