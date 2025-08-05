@@ -4,7 +4,7 @@ import { apiService } from "../services/api";
 
 export interface LoginPageProps {
   onLogin: () => void;
-  onSwitchToSignup: () => void; // <-- Add this line
+  onSwitchToSignup: () => void;
   onRoleSelect: (role: "admin" | "vendor") => void;
   onForgotPassword: () => void;
   onOTPRequired: (email: string) => void;
@@ -12,6 +12,7 @@ export interface LoginPageProps {
 
 export default function LoginPage({
   onLogin,
+  onSwitchToSignup,
   onRoleSelect,
   onForgotPassword,
   onOTPRequired,
@@ -35,12 +36,12 @@ export default function LoginPage({
         // Store token
         localStorage.setItem("auth_token", response.data.token);
 
-        // Set user role
+        // Set user role and persist it
         const userRole = response.data.user.role.toLowerCase();
         if (userRole === "admin" || userRole === "vendor") {
+          localStorage.setItem("user_role", userRole); // Persist role
           onRoleSelect(userRole as "admin" | "vendor");
         } else {
-          // Handle unexpected roles
           setError(`Unsupported user role: ${response.data.user.role}`);
           return;
         }
@@ -220,6 +221,18 @@ export default function LoginPage({
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+
+          {/* Signup link */}
+          <div className="mt-6 text-center">
+            <span className="text-gray-600">Don't have an account? </span>
+            <button
+              type="button"
+              onClick={onSwitchToSignup}
+              className="text-red-600 hover:underline font-medium"
+            >
+              Sign up
+            </button>
+          </div>
         </div>
       </div>
     </div>

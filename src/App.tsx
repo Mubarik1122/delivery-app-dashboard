@@ -35,19 +35,11 @@ import {
   AlertTriangle,
   Gift,
   Bell,
-  MessageSquare,
-  FileText,
-  CreditCard,
-  UserCheck,
-  Mail,
-  Settings,
-  Store,
-  Utensils,
 } from "lucide-react";
 
 function App() {
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Default to false - user must login
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<
     "login" | "signup" | "forgot-password" | "otp-verification"
   >("login");
@@ -55,14 +47,19 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [showAddDeliveryman, setShowAddDeliveryman] = useState(false);
   const [showAddVendor, setShowAddVendor] = useState(false);
-  const [userRole, setUserRole] = useState<"admin" | "vendor">("admin");
 
-  // Check for existing authentication on app load
+  // Persist userRole in localStorage
+  const [userRole, setUserRole] = useState<"admin" | "vendor">(
+    (localStorage.getItem("user_role") as "admin" | "vendor") || "admin"
+  );
+
+  // Check for existing authentication and user role on app load
   React.useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (token) {
-      // TODO: Optionally verify token with backend
+    const savedRole = localStorage.getItem("user_role");
+    if (token && savedRole) {
       setIsAuthenticated(true);
+      setUserRole(savedRole as "admin" | "vendor");
     }
   }, []);
 
@@ -81,20 +78,25 @@ function App() {
     const userRole = user.role.toLowerCase();
     if (userRole === "admin" || userRole === "vendor") {
       setUserRole(userRole as "admin" | "vendor");
+      localStorage.setItem("user_role", userRole);
     } else {
       // Handle unexpected roles - default to vendor but could show error
       console.warn(`Unexpected user role: ${user.role}, defaulting to vendor`);
       setUserRole("vendor");
+      localStorage.setItem("user_role", "vendor");
     }
     setIsAuthenticated(true);
     setAuthMode("login");
   };
+
   const handleRoleSelect = (role: "admin" | "vendor") => {
     setUserRole(role);
+    localStorage.setItem("user_role", role);
   };
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("user_role");
     setIsAuthenticated(false);
     setActiveSection("dashboard");
     setShowProfile(false);
@@ -177,10 +179,8 @@ function App() {
           onSectionChange={setActiveSection}
           userRole={userRole}
         />
-
         <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
           <Header onProfileAction={handleProfileAction} userRole={userRole} />
-
           <main className="flex-1 overflow-auto p-4 lg:p-6">
             <ProfilePage onBack={() => setShowProfile(false)} />
           </main>
@@ -189,6 +189,7 @@ function App() {
     );
   }
 
+  // Demo data for dashboard and other pages
   const orderStats = [
     { title: "Pending", value: 49, icon: Clock, color: "orange" as const },
     {
@@ -588,10 +589,8 @@ function App() {
         onSectionChange={setActiveSection}
         userRole={userRole}
       />
-
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         <Header onProfileAction={handleProfileAction} userRole={userRole} />
-
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           {renderContent()}
         </main>
