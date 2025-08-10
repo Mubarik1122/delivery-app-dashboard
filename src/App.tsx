@@ -1,4 +1,11 @@
 import React, { useState } from "react";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import LoginPage from "./components/LoginPage";
@@ -25,6 +32,7 @@ import VendorDashboard from "./components/VendorDashboard";
 import VendorsPage from "./components/VendorsPage";
 import AddVendorPage from "./components/AddVendorPage";
 import CategoriesPage from "./components/CategoriesPage";
+import CategoryDetailPage from "./components/CategoryDetailPage";
 import {
   Clock,
   CheckCircle,
@@ -38,15 +46,14 @@ import {
 } from "lucide-react";
 
 function App() {
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<
     "login" | "signup" | "forgot-password" | "otp-verification"
   >("login");
   const [otpEmail, setOtpEmail] = useState("");
   const [showProfile, setShowProfile] = useState(false);
-  const [showAddDeliveryman, setShowAddDeliveryman] = useState(false);
-  const [showAddVendor, setShowAddVendor] = useState(false);
 
   // Persist userRole in localStorage
   const [userRole, setUserRole] = useState<"admin" | "vendor">(
@@ -98,11 +105,10 @@ function App() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_role");
     setIsAuthenticated(false);
-    setActiveSection("dashboard");
     setShowProfile(false);
-    setShowAddVendor(false);
     setUserRole("admin");
     setAuthMode("login");
+    navigate("/dashboard");
   };
 
   const handleProfileAction = (action: "profile" | "logout" | "login") => {
@@ -175,8 +181,8 @@ function App() {
     return (
       <div className="flex h-screen bg-gray-50">
         <Sidebar
-          activeSection={activeSection}
-          onSectionChange={setActiveSection}
+          activeSection={location.pathname.slice(1) || "dashboard"}
+          onSectionChange={(section) => navigate(`/${section}`)}
           userRole={userRole}
         />
         <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
@@ -189,7 +195,108 @@ function App() {
     );
   }
 
-  // Demo data for dashboard and other pages
+  // Main authenticated app with routing
+
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar
+        activeSection={location.pathname.slice(1) || "dashboard"}
+        onSectionChange={(section) => navigate(`/${section}`)}
+        userRole={userRole}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+        <Header onProfileAction={handleProfileAction} userRole={userRole} />
+        <main className="flex-1 overflow-auto p-4 lg:p-6">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route
+              path="/dashboard"
+              element={
+                userRole === "vendor" ? (
+                  <VendorDashboard />
+                ) : (
+                  <DashboardContent />
+                )
+              }
+            />
+            <Route path="/pos" element={<POSPage />} />
+            <Route path="/food" element={<FoodPage />} />
+            <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/categories/:id" element={<CategoryDetailPage />} />
+            <Route path="/customer" element={<CustomerPage />} />
+            <Route
+              path="/delivery-man-list"
+              element={<DeliverymanListPage />}
+            />
+            <Route
+              path="/add-new-delivery-man"
+              element={
+                <AddDeliverymanPage
+                  onBack={() => navigate("/delivery-man-list")}
+                />
+              }
+            />
+            <Route
+              path="/new-joining-request"
+              element={<JoiningRequestPage />}
+            />
+            <Route
+              path="/delivery-man-reviews"
+              element={<DeliverymanReviewsPage />}
+            />
+            <Route
+              path="/vendors"
+              element={
+                <VendorsPage onAddVendor={() => navigate("/vendors/add")} />
+              }
+            />
+            <Route
+              path="/vendors/add"
+              element={<AddVendorPage onBack={() => navigate("/vendors")} />}
+            />
+            <Route
+              path="/coupon"
+              element={
+                <GenericPage
+                  title="Coupon Management"
+                  description="Create discount coupons and promotional codes to boost sales. Set up percentage discounts, fixed amount discounts, and special promotional offers for your customers."
+                  icon={<Gift className="w-16 h-16 text-green-500" />}
+                />
+              }
+            />
+            <Route
+              path="/notification"
+              element={
+                <GenericPage
+                  title="Send Notifications"
+                  description="Send push notifications and alerts to your customers. Keep them informed about order updates, special offers, and important announcements."
+                  icon={<Bell className="w-16 h-16 text-orange-500" />}
+                />
+              }
+            />
+            <Route
+              path="/*-orders"
+              element={<OrdersPage orderType={location.pathname.slice(1)} />}
+            />
+            <Route
+              path="*"
+              element={
+                <GenericPage
+                  title="Page Not Found"
+                  description="The page you're looking for doesn't exist or is under development."
+                />
+              }
+            />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// Dashboard content component
+function DashboardContent() {
+  // Demo data for dashboard
   const orderStats = [
     { title: "Pending", value: 49, icon: Clock, color: "orange" as const },
     {
@@ -378,222 +485,112 @@ function App() {
     },
   ];
 
-  const renderContent = () => {
-    switch (activeSection) {
-      case "dashboard":
-        if (userRole === "vendor") {
-          return <VendorDashboard />;
-        }
-        return (
-          <div className="space-y-6">
-            {/* Welcome Section */}
-            <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl text-white p-6 lg:p-8">
-              <h1 className="text-2xl lg:text-3xl font-bold mb-2">
-                Welcome back, Admin! 👋
-              </h1>
-              <p className="text-red-100">
-                Monitor your business analytics and manage your food delivery
-                operations
-              </p>
-            </div>
+  return (
+    <div className="space-y-6">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl text-white p-6 lg:p-8">
+        <h1 className="text-2xl lg:text-3xl font-bold mb-2">
+          Welcome back, Admin! 👋
+        </h1>
+        <p className="text-red-100">
+          Monitor your business analytics and manage your food delivery
+          operations
+        </p>
+      </div>
 
-            {/* Business Analytics */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h2 className="text-xl lg:text-2xl font-semibold text-gray-800 mb-6">
-                Business Analytics
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-                {orderStats.map((stat, index) => (
-                  <StatsCard key={index} {...stat} />
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                {additionalStats.map((stat, index) => (
-                  <StatsCard key={index} {...stat} />
-                ))}
-              </div>
-            </div>
+      {/* Business Analytics */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-xl lg:text-2xl font-semibold text-gray-800 mb-6">
+          Business Analytics
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
+          {orderStats.map((stat, index) => (
+            <StatsCard key={index} {...stat} />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          {additionalStats.map((stat, index) => (
+            <StatsCard key={index} {...stat} />
+          ))}
+        </div>
+      </div>
 
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <Chart
-                title="Order Statistics"
-                data={orderChartData}
-                type="line"
-              />
-              <Chart
-                title="Earnings Statistics"
-                data={earningsChartData}
-                type="bar"
-                color="rgb(34, 197, 94)"
-              />
-            </div>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Chart title="Order Statistics" data={orderChartData} type="line" />
+        <Chart
+          title="Earnings Statistics"
+          data={earningsChartData}
+          type="bar"
+          color="rgb(34, 197, 94)"
+        />
+      </div>
 
-            {/* Order Status and Recent Orders */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-1">
-                <OrderStatusChart data={orderStatusData} />
-              </div>
-              <div className="xl:col-span-2">
-                <RecentOrders orders={recentOrders} />
-              </div>
-            </div>
+      {/* Order Status and Recent Orders */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-1">
+          <OrderStatusChart data={orderStatusData} />
+        </div>
+        <div className="xl:col-span-2">
+          <RecentOrders orders={recentOrders} />
+        </div>
+      </div>
 
-            {/* Products and Customers Section */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Top Selling Products
-                    </h3>
-                    <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                      View All
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 space-y-4">
-                  {topProducts.map((product, index) => (
-                    <ProductCard key={index} {...product} />
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Most Rated Products
-                    </h3>
-                    <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                      View All
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 space-y-4">
-                  {mostRatedProducts.map((product, index) => (
-                    <ProductCard key={index} {...product} />
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-200">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Top Customers
-                    </h3>
-                    <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                      View All
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 space-y-4">
-                  {topCustomers.map((customer, index) => (
-                    <CustomerCard key={index} {...customer} />
-                  ))}
-                </div>
-              </div>
+      {/* Products and Customers Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Top Selling Products
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
             </div>
           </div>
-        );
+          <div className="p-4 space-y-4">
+            {topProducts.map((product, index) => (
+              <ProductCard key={index} {...product} />
+            ))}
+          </div>
+        </div>
 
-      case "pos":
-        return <POSPage />;
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Most Rated Products
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {mostRatedProducts.map((product, index) => (
+              <ProductCard key={index} {...product} />
+            ))}
+          </div>
+        </div>
 
-      case "food":
-        return <FoodPage />;
-
-      case "categories":
-        return <CategoriesPage />;
-
-      case "customer":
-        return <CustomerPage />;
-
-      case "delivery-man-list":
-        if (showAddDeliveryman) {
-          return (
-            <AddDeliverymanPage onBack={() => setShowAddDeliveryman(false)} />
-          );
-        }
-        return <DeliverymanListPage />;
-
-      case "add-new-delivery-man":
-        return (
-          <AddDeliverymanPage
-            onBack={() => setActiveSection("delivery-man-list")}
-          />
-        );
-
-      case "new-joining-request":
-        return <JoiningRequestPage />;
-
-      case "delivery-man-reviews":
-        return <DeliverymanReviewsPage />;
-
-      case "vendors":
-        if (showAddVendor) {
-          return <AddVendorPage onBack={() => setShowAddVendor(false)} />;
-        }
-        return <VendorsPage onAddVendor={() => setShowAddVendor(true)} />;
-
-      case "coupon":
-        return (
-          <GenericPage
-            title="Coupon Management"
-            description="Create discount coupons and promotional codes to boost sales. Set up percentage discounts, fixed amount discounts, and special promotional offers for your customers."
-            icon={<Gift className="w-16 h-16 text-green-500" />}
-          />
-        );
-
-      case "notification":
-        return (
-          <GenericPage
-            title="Send Notifications"
-            description="Send push notifications and alerts to your customers. Keep them informed about order updates, special offers, and important announcements."
-            icon={<Bell className="w-16 h-16 text-orange-500" />}
-          />
-        );
-
-      default:
-        if (activeSection.includes("orders")) {
-          return <OrdersPage orderType={activeSection} />;
-        }
-        if (activeSection.includes("delivery") && userRole === "admin") {
-          return <DeliverymanListPage />;
-        }
-        if (activeSection.includes("delivery") && userRole !== "admin") {
-          return (
-            <GenericPage
-              title="Access Denied"
-              description="Delivery management is only available for admin users."
-            />
-          );
-        }
-        return (
-          <GenericPage
-            title={
-              activeSection.charAt(0).toUpperCase() +
-              activeSection.slice(1).replace("-", " ")
-            }
-            description="This section is currently under development. More features and functionality will be available soon."
-          />
-        );
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        userRole={userRole}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        <Header onProfileAction={handleProfileAction} userRole={userRole} />
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
-          {renderContent()}
-        </main>
+        <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Top Customers
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {topCustomers.map((customer, index) => (
+              <CustomerCard key={index} {...customer} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
