@@ -531,69 +531,71 @@ export default function CategoriesPage() {
                 Cover Image
               </h3>
               <div>
-              {/* Image Upload Options */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Image URL
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.coverImage}
-                      onChange={(e) =>
-                        handleInputChange("coverImage", e.target.value)
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                      placeholder="Enter image URL or upload a file"
-                      disabled={isSubmitting || isUploadingImage}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm text-gray-500 mb-2">OR</span>
-                    <label className="cursor-pointer">
+                {/* Image Upload Options */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Image URL
+                      </label>
                       <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleImageUpload(file);
-                          }
-                        }}
-                        className="hidden"
+                        type="url"
+                        value={formData.coverImage}
+                        onChange={(e) =>
+                          handleInputChange("coverImage", e.target.value)
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Enter image URL or upload a file"
                         disabled={isSubmitting || isUploadingImage}
                       />
-                      <div className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
-                        {isUploadingImage ? (
-                          <Loader className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Upload className="w-4 h-4" />
-                        )}
-                        <span className="text-sm">
-                          {isUploadingImage ? "Uploading..." : "Upload"}
-                        </span>
-                      </div>
-                    </label>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-sm text-gray-500 mb-2">OR</span>
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleImageUpload(file);
+                            }
+                          }}
+                          className="hidden"
+                          disabled={isSubmitting || isUploadingImage}
+                        />
+                        <div className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                          {isUploadingImage ? (
+                            <Loader className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Upload className="w-4 h-4" />
+                          )}
+                          <span className="text-sm">
+                            {isUploadingImage ? "Uploading..." : "Upload"}
+                          </span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
-                </div>
 
-                {formData.coverImage && (
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Preview
-                    </label>
-                    <img
-                      src={formData.coverImage}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src =
-                          "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
-                      }}
-                    />
-                  </div>
-                )}
+                  {formData.coverImage && (
+                    <div className="mt-3">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Preview
+                      </label>
+                      <img
+                        src={formData.coverImage}
+                        alt="Preview"
+                        className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                        onError={(e) => {
+                          e.currentTarget.src =
+                            "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Submit Buttons */}
