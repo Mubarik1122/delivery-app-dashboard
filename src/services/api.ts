@@ -234,6 +234,35 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+
+  async getCategoryById(id: number): Promise<CategoryResponse> {
+    return this.makeRequest<CategoryResponse>(`/category/getById/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async uploadImage(file: File): Promise<{ success: boolean; url: string; message: string }> {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/upload/image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    return response.json();
+  }
 }
 
 export const apiService = new ApiService();

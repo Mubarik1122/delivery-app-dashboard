@@ -43,7 +43,19 @@ const mockProducts = [
   },
 ];
 
-export default function CategoryDetailPage() {
+interface CategoryDetailPageProps {
+  category?: Category;
+  onBack: () => void;
+  onEdit: (category: Category) => void;
+  onDelete: (categoryId: number) => void;
+}
+
+export default function CategoryDetailPage({
+  category: propCategory,
+  onBack,
+  onEdit,
+  onDelete,
+}: CategoryDetailPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [category, setCategory] = useState<Category | null>(null);
@@ -53,29 +65,64 @@ export default function CategoryDetailPage() {
   const [subCategories, setSubCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    if (id) {
+    if (id && !propCategory) {
       fetchCategoryDetails(id);
+    } else if (propCategory) {
+      setCategory(propCategory);
+      setLoading(false);
     }
-  }, [id]);
+  }, [id, propCategory]);
 
   const fetchCategoryDetails = async (categoryId: string) => {
     try {
       setLoading(true);
       setError(null);
-      // In a real app, you would fetch the specific category by ID
-      // For now, we'll fetch all categories and find the one we need
-      const response = await apiService.getAllCategories();
-      const foundCategory = response.data?.find(
-        (cat) => cat.id.toString() === categoryId
-      );
+      
+      // Try to get category by ID first (if API supports it)
+      try {
+        const response = await apiService.getCategoryById(parseInt(categoryId));
+        if (response.errorCode === 0 && response.data) {
+          setCategory(response.data);
+          setProducts(mockProducts);
+          setSubCategories([]);
+          return;
+        }
+      } catch (err) {
+        console.log('getCategoryById not available, falling back to getAll');
+      }
 
-      if (foundCategory) {
-        setCategory(foundCategory);
-        // Fetch products and subcategories for this category
-        setProducts(mockProducts);
-        setSubCategories([]);
+      // Fallback to getting all categories and finding the one we need
+      const allCategoriesResponse = await apiService.getAllCategories();
+      if (allCategoriesResponse.errorCode === 0 && allCategoriesResponse.data) {
+        const foundCategory = allCategoriesResponse.data.find(
+          (cat: any) => cat.id.toString() === categoryId
+        );
+
+        if (foundCategory) {
+          // Map the category data properly
+          const mappedCategory: Category = {
+            id: foundCategory.id,
+            categoryName: foundCategory.category_name || foundCategory.categoryName,
+            shortDescription: foundCategory.short_description || foundCategory.shortDescription,
+            longDescription: foundCategory.long_description || foundCategory.longDescription,
+            isSubCategory: foundCategory.is_sub_category || foundCategory.isSubCategory,
+            coverImage: foundCategory.cover_image || foundCategory.coverImage || 
+              "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300",
+            parentCategoryIds: Array.isArray(foundCategory.parent_categories)
+              ? foundCategory.parent_categories.map((p: any) => p.id)
+              : foundCategory.parentCategoryIds || [],
+            createdAt: foundCategory.created_at || foundCategory.createdAt,
+            updatedAt: foundCategory.updated_at || foundCategory.updatedAt,
+          };
+          
+          setCategory(mappedCategory);
+          setProducts(mockProducts);
+          setSubCategories([]);
+        } else {
+          setError("Category not found");
+        }
       } else {
-        setError("Category not found");
+        setError(allCategoriesResponse.errorMessage || "Failed to load category");
       }
     } catch (err) {
       console.error("Error fetching category details:", err);
@@ -85,30 +132,9 @@ export default function CategoryDetailPage() {
     }
   };
 
-  const handleBack = () => {
-    navigate("/categories");
-  };
-
-  const handleEdit = (category: Category) => {
-    // Navigate back to categories page with edit mode
-    navigate("/categories", { state: { editCategory: category } });
-  };
-
-  const handleDelete = async (categoryId: number) => {
-    if (window.confirm("Are you sure you want to delete this category?")) {
-      try {
-        await apiService.deleteCategory({ categoryId });
-        navigate("/categories");
-      } catch (err) {
-        console.error("Error deleting category:", err);
-        alert("Failed to delete category");
-      }
-    }
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
         <span className="ml-2 text-gray-600">Loading category details...</span>
       </div>
@@ -117,7 +143,7 @@ export default function CategoryDetailPage() {
 
   if (error || !category) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
           Category Not Found
         </h2>
@@ -125,7 +151,7 @@ export default function CategoryDetailPage() {
           {error || "The requested category could not be found."}
         </p>
         <button
-          onClick={handleBack}
+          onClick={onBack}
           className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
         >
           Back to Categories
@@ -155,7 +181,7 @@ export default function CategoryDetailPage() {
 
           {/* Back Button */}
           <button
-            onClick={handleBack}
+            onClick={onBack}
             className="absolute top-4 left-4 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-lg p-2 transition-all duration-200 flex items-center space-x-2"
           >
             <ArrowLeft className="w-5 h-5 text-gray-700" />
@@ -196,14 +222,14 @@ export default function CategoryDetailPage() {
             {/* Action Buttons */}
             <div className="flex items-center space-x-3 ml-6">
               <button
-                onClick={() => handleEdit(category)}
+                onClick={() => onEdit(category)}
                 className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
               >
                 <Edit className="w-4 h-4" />
                 <span>Edit</span>
               </button>
               <button
-                onClick={() => handleDelete(category.id)}
+                onClick={() => onDelete(category.id)}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="w-4 h-4" />

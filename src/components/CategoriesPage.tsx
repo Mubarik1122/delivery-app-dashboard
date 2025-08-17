@@ -19,6 +19,8 @@ import {
   Package,
   Grid,
   List,
+  Upload,
+  Camera,
 } from "lucide-react";
 import {
   apiService,
@@ -40,6 +42,7 @@ export default function CategoriesPage() {
   );
   const [showCategoryDetail, setShowCategoryDetail] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
     new Set()
   );
@@ -173,6 +176,25 @@ export default function CategoriesPage() {
     });
     setEditingCategory(category);
     setShowAddForm(true);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setIsUploadingImage(true);
+    setError("");
+
+    try {
+      const response = await apiService.uploadImage(file);
+      if (response.success) {
+        handleInputChange("coverImage", response.url);
+      } else {
+        setError(response.message || "Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setError(error instanceof Error ? error.message : "Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -509,21 +531,58 @@ export default function CategoriesPage() {
                 Cover Image
               </h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.coverImage}
-                  onChange={(e) =>
-                    handleInputChange("coverImage", e.target.value)
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Enter image URL or leave empty for default"
-                  disabled={isSubmitting}
-                />
+              {/* Image Upload Options */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Image URL
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.coverImage}
+                      onChange={(e) =>
+                        handleInputChange("coverImage", e.target.value)
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      placeholder="Enter image URL or upload a file"
+                      disabled={isSubmitting || isUploadingImage}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-sm text-gray-500 mb-2">OR</span>
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            handleImageUpload(file);
+                          }
+                        }}
+                        className="hidden"
+                        disabled={isSubmitting || isUploadingImage}
+                      />
+                      <div className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors">
+                        {isUploadingImage ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        <span className="text-sm">
+                          {isUploadingImage ? "Uploading..." : "Upload"}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
                 {formData.coverImage && (
                   <div className="mt-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Preview
+                    </label>
                     <img
                       src={formData.coverImage}
                       alt="Preview"
@@ -535,7 +594,6 @@ export default function CategoriesPage() {
                     />
                   </div>
                 )}
-              </div>
             </div>
 
             {/* Submit Buttons */}
@@ -543,19 +601,20 @@ export default function CategoriesPage() {
               <button
                 type="submit"
                 disabled={
-                  isSubmitting ||
+                  isSubmitting || 
+                  isUploadingImage ||
                   (formData.isSubCategory &&
                     formData.parentCategoryIds.length === 0)
                 }
                 className="bg-red-500 text-white px-8 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? (
+                {isSubmitting || isUploadingImage ? (
                   <Loader className="w-5 h-5 animate-spin" />
                 ) : (
                   <Save className="w-5 h-5" />
                 )}
                 <span>
-                  {isSubmitting
+                  {isSubmitting || isUploadingImage
                     ? editingCategory
                       ? "Updating..."
                       : "Creating..."
@@ -570,7 +629,7 @@ export default function CategoriesPage() {
                   setShowAddForm(false);
                   resetForm();
                 }}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingImage}
                 className="bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Cancel
