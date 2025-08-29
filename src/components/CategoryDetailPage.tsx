@@ -43,7 +43,12 @@ const mockProducts = [
   },
 ];
 
-export default function CategoryDetailPage() {
+interface CategoryDetailPageProps {
+  onBack?: () => void;
+  onEdit?: (category: Category) => void;
+  onDelete?: (categoryId: number) => void;
+}
+export default function CategoryDetailPage({ onBack, onEdit, onDelete }: CategoryDetailPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [category, setCategory] = useState<Category | null>(null);
@@ -160,19 +165,31 @@ export default function CategoryDetailPage() {
   };
 
   const handleBack = () => {
-    navigate("/categories");
+    if (onBack) {
+      onBack();
+    } else {
+      navigate("/categories");
+    }
   };
 
   const handleEdit = (category: Category) => {
-    // Navigate back to categories page with edit mode
-    navigate("/categories", { state: { editCategory: category } });
+    if (onEdit) {
+      onEdit(category);
+    } else {
+      // Navigate back to categories page with edit mode
+      navigate("/categories", { state: { editCategory: category } });
+    }
   };
 
   const handleDelete = async (categoryId: number) => {
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
         await apiService.deleteCategory({ categoryId });
-        navigate("/categories");
+        if (onDelete) {
+          onDelete(categoryId);
+        } else {
+          navigate("/categories");
+        }
       } catch (err) {
         console.error("Error deleting category:", err);
         alert("Failed to delete category");

@@ -28,19 +28,16 @@ import {
   CreateUpdateCategoryRequest,
   UpdateCategoryRequest,
 } from "../services/api";
-import CategoryDetailPage from "./CategoryDetailPage";
+import { useNavigate } from "react-router-dom";
 
 export default function CategoriesPage() {
+  const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
-    null
-  );
-  const [showCategoryDetail, setShowCategoryDetail] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
     new Set()
@@ -522,8 +519,7 @@ export default function CategoriesPage() {
   };
 
   const handleViewCategory = (category: Category) => {
-    setSelectedCategory(category);
-    setShowCategoryDetail(true);
+    navigate(`/categories/${category.id}`);
   };
 
   const handleDeleteCategory = async (categoryId: number) => {
@@ -561,26 +557,6 @@ export default function CategoriesPage() {
     loadCategories();
   };
 
-  // Show category detail page
-  if (showCategoryDetail && selectedCategory) {
-    return (
-      <CategoryDetailPage
-        category={selectedCategory}
-        onBack={() => {
-          setShowCategoryDetail(false);
-          setSelectedCategory(null);
-        }}
-        onEdit={(category) => {
-          setShowCategoryDetail(false);
-          handleEditCategory(category);
-        }}
-        onDelete={(categoryId) => {
-          setShowCategoryDetail(false);
-          handleDeleteCategory(categoryId);
-        }}
-      />
-    );
-  }
 
   if (showAddForm) {
     return (
