@@ -19,6 +19,8 @@ import {
   Package,
   Grid,
   List,
+  Upload,
+  Link,
 } from "lucide-react";
 import {
   apiService,
@@ -44,6 +46,11 @@ export default function CategoriesPage() {
     new Set()
   );
   const [filterType, setFilterType] = useState<"all" | "parent" | "sub">("all");
+  const [imageUploadMethod, setImageUploadMethod] = useState<"url" | "upload">(
+    "url"
+  );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState({
     categoryName: "",
     shortDescription: "",
@@ -58,6 +65,9 @@ export default function CategoriesPage() {
     loadCategories();
   }, []);
 
+  // Default demo image
+  const DEFAULT_IMAGE =
+    "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
   const loadCategories = async () => {
     try {
       setLoading(true);
@@ -74,9 +84,7 @@ export default function CategoriesPage() {
           shortDescription: cat.short_description,
           longDescription: cat.long_description,
           isSubCategory: cat.is_sub_category,
-          coverImage:
-            cat.cover_image ||
-            "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300",
+          coverImage: cat.cover_image || DEFAULT_IMAGE,
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
@@ -105,39 +113,276 @@ export default function CategoriesPage() {
     );
   };
 
-  // Get orphaned subcategories (subcategories without parents in the list)
-  const orphanedSubCategories = categories.filter(
-    (cat) =>
-      cat.isSubCategory &&
-      cat.parentCategoryIds?.length > 0 &&
-      !cat.parentCategoryIds.some((id) => categories.some((c) => c.id === id))
-  );
+  // Build category tree structure
+  const buildCategoryTree = (categories: Category[]): Category[] => {
+    const categoryMap = new Map<number, Category & { children: Category[] }>();
+    const rootCategories: (Category & { children: Category[] })[] = [];
 
-  // Filter categories based on search and filter type
-  const filterCategory = (category: Category) => {
-    const matchesSearch =
-      category.categoryName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      category.shortDescription
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      category.longDescription
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+    // Initialize all categories with children array
+    categories.forEach((cat) => {
+      categoryMap.set(cat.id, { ...cat, children: [] });
+    });
 
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "parent" && !category.isSubCategory) ||
-      (filterType === "sub" && category.isSubCategory);
+    // Build the tree structure
+    categories.forEach((cat) => {
+      const categoryWithChildren = categoryMap.get(cat.id)!;
 
-    return matchesSearch && matchesFilter;
+      if (!cat.isSubCategory || !cat.parentCategoryIds?.length) {
+        // Root category
+        rootCategories.push(categoryWithChildren);
+      } else {
+        // Sub-category - add to all its parents
+        cat.parentCategoryIds.forEach((parentId) => {
+          const parent = categoryMap.get(parentId);
+          if (parent) {
+            parent.children.push(categoryWithChildren);
+          }
+        });
+      }
+    });
+
+    return rootCategories;
   };
 
-  // Get filtered parent categories
-  const filteredParentCategories = parentCategories.filter(filterCategory);
+  // Recursive function to check if category or its children match search
+  const categoryMatchesSearch = (
+    category: Category,
+    searchTerm: string
+  ): boolean => {
+    if (!searchTerm) return true;
 
-  // Get filtered orphaned subcategories
-  const filteredOrphanedSubCategories =
-    orphanedSubCategories.filter(filterCategory);
+    const searchLower = searchTerm.toLowerCase();
+    const matchesName = category.categoryName
+      ?.toLowerCase()
+      .includes(searchLower);
+    const matchesShort = category.shortDescription
+      ?.toLowerCase()
+      .includes(searchLower);
+    const matchesLong = category.longDescription
+      ?.toLowerCase()
+      .includes(searchLower);
+
+    return matchesName || matchesShort || matchesLong;
+  };
+
+  // Recursive function to filter category tree
+  const filterCategoryTree = (
+    categories: (Category & { children: Category[] })[],
+    searchTerm: string,
+    filterType: string
+  ): (Category & { children: Category[] })[] => {
+    return categories.reduce((filtered, category) => {
+      const matchesSearch = categoryMatchesSearch(category, searchTerm);
+      const matchesFilter =
+        filterType === "all" ||
+        (filterType === "parent" && !category.isSubCategory) ||
+        (filterType === "sub" && category.isSubCategory);
+
+      // Recursively filter children
+      const filteredChildren = filterCategoryTree(
+        category.children,
+        searchTerm,
+        filterType
+      );
+
+      // Include category if it matches or has matching children
+      const shouldInclude =
+        (matchesSearch && matchesFilter) || filteredChildren.length > 0;
+
+      if (shouldInclude) {
+        filtered.push({
+          ...category,
+          children: filteredChildren,
+        });
+      }
+
+      return filtered;
+    }, [] as (Category & { children: Category[] })[]);
+  };
+
+  // Get category tree and apply filters
+  const categoryTree = buildCategoryTree(categories);
+  const filteredCategoryTree = filterCategoryTree(
+    categoryTree,
+    searchTerm,
+    filterType
+  );
+
+  // Count categories recursively
+  const countCategoriesInTree = (
+    tree: (Category & { children: Category[] })[]
+  ): number => {
+    return tree.reduce((count, category) => {
+      return count + 1 + countCategoriesInTree(category.children);
+    }, 0);
+  };
+
+  const filteredCount = countCategoriesInTree(filteredCategoryTree);
+
+  // Recursive component to render category tree
+  const CategoryTreeItem = ({
+    category,
+    level = 0,
+  }: {
+    category: Category & { children: Category[] };
+    level?: number;
+  }) => {
+    const isExpanded = expandedCategories.has(category.id);
+    const hasChildren = category.children.length > 0;
+    const indentClass = level > 0 ? `ml-${Math.min(level * 4, 16)}` : "";
+    const borderColor =
+      level === 0
+        ? "border-blue-300"
+        : level === 1
+        ? "border-orange-300"
+        : "border-purple-300";
+
+    return (
+      <div key={category.id}>
+        {/* Category Row */}
+        <div
+          className={`hover:bg-gray-50 transition-colors ${
+            level > 0 ? "bg-gray-25" : ""
+          }`}
+        >
+          <div
+            className={`grid grid-cols-12 gap-4 px-6 py-4 items-center ${
+              level > 0 ? `border-l-4 ${borderColor} ${indentClass}` : ""
+            }`}
+          >
+            <div className="col-span-1">
+              {hasChildren && (
+                <button
+                  onClick={() => toggleCategoryExpansion(category.id)}
+                  className="p-1 hover:bg-gray-200 rounded transition-colors"
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-gray-600" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-600" />
+                  )}
+                </button>
+              )}
+            </div>
+
+            <div className="col-span-4">
+              <div className="flex items-center space-x-3">
+                <div
+                  className={`${
+                    level > 0 ? "w-10 h-10" : "w-12 h-12"
+                  } rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center`}
+                >
+                  <img
+                    src={category.coverImage}
+                    alt={category.categoryName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      e.currentTarget.nextElementSibling?.classList.remove(
+                        "hidden"
+                      );
+                    }}
+                  />
+                  <ImageIcon className="w-4 h-4 text-gray-400 hidden" />
+                </div>
+                <div>
+                  <h4
+                    className={`font-semibold text-gray-800 ${
+                      level > 0 ? "text-sm" : ""
+                    }`}
+                  >
+                    {"↳ ".repeat(level)}
+                    {category.categoryName}
+                  </h4>
+                  {hasChildren && (
+                    <span className="text-xs text-gray-500">
+                      {category.children.length} sub-categories
+                    </span>
+                  )}
+                  {level > 0 && (
+                    <span className="text-xs text-gray-400">
+                      Level {level + 1}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-3">
+              <p
+                className={`text-gray-600 line-clamp-2 ${
+                  level > 0 ? "text-xs" : "text-sm"
+                }`}
+              >
+                {category.shortDescription}
+              </p>
+            </div>
+
+            <div className="col-span-2">
+              <span
+                className={`px-3 py-1 text-xs font-medium rounded-full ${
+                  !category.isSubCategory
+                    ? "bg-blue-100 text-blue-800"
+                    : level === 0
+                    ? "bg-orange-100 text-orange-800"
+                    : "bg-purple-100 text-purple-800"
+                }`}
+              >
+                {!category.isSubCategory ? "Parent" : `Sub-Level ${level + 1}`}
+              </span>
+            </div>
+
+            <div className="col-span-2">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handleViewCategory(category)}
+                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="View Details"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleEditCategory(category)}
+                  className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  title="Edit Category"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteCategory(category.id)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Delete Category"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Render Children */}
+        {isExpanded && hasChildren && (
+          <div
+            className={
+              level === 0
+                ? "bg-gray-50"
+                : level === 1
+                ? "bg-gray-100"
+                : "bg-gray-150"
+            }
+          >
+            {category.children.map((child) => (
+              <CategoryTreeItem
+                key={child.id}
+                category={child}
+                level={level + 1}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const totalCategories = categories.length;
   const parentCategoriesCount = parentCategories.length;
@@ -155,8 +400,38 @@ export default function CategoriesPage() {
       coverImage: "",
     });
     setEditingCategory(null);
+    setSelectedFile(null);
+    setImagePreview("");
+    setImageUploadMethod("url");
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        setError("Please select a valid image file");
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size should be less than 5MB");
+        return;
+      }
+
+      setSelectedFile(file);
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setImagePreview(result);
+        handleInputChange("coverImage", result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   const handleAddCategory = () => {
     resetForm();
     setShowAddForm(true);
@@ -171,6 +446,10 @@ export default function CategoriesPage() {
       isSubCategory: category.isSubCategory,
       coverImage: category.coverImage,
     });
+    setImagePreview(category.coverImage);
+    if (category.coverImage && category.coverImage !== DEFAULT_IMAGE) {
+      setImageUploadMethod("url");
+    }
     setEditingCategory(category);
     setShowAddForm(true);
   };
@@ -187,15 +466,15 @@ export default function CategoriesPage() {
         return;
       }
 
+      // Use default image if no image is provided
+      const finalCoverImage = formData.coverImage.trim() || DEFAULT_IMAGE;
       const categoryData = {
         ...(editingCategory && { id: editingCategory.id }),
         categoryName: formData.categoryName.trim(),
         shortDescription: formData.shortDescription.trim(),
         longDescription: formData.longDescription.trim(),
         isSubCategory: formData.isSubCategory,
-        coverImage:
-          formData.coverImage.trim() ||
-          "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300",
+        coverImage: finalCoverImage,
         parentCategoryIds: formData.isSubCategory
           ? formData.parentCategoryIds
           : [],
@@ -445,57 +724,32 @@ export default function CategoriesPage() {
                 {formData.isSubCategory && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Parent Categories *
+                      Select Parent Category *
                     </label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-lg p-3">
-                      {parentCategories.map((category) => (
-                        <label
-                          key={category.id}
-                          className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.parentCategoryIds.includes(
-                              category.id
-                            )}
-                            onChange={(e) => {
-                              const currentIds = formData.parentCategoryIds;
-                              if (e.target.checked) {
-                                handleInputChange("parentCategoryIds", [
-                                  ...currentIds,
-                                  category.id,
-                                ]);
-                              } else {
-                                handleInputChange(
-                                  "parentCategoryIds",
-                                  currentIds.filter((id) => id !== category.id)
-                                );
-                              }
-                            }}
-                            className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
-                            disabled={isSubmitting}
-                          />
-                          <div className="flex items-center space-x-2">
-                            <img
-                              src={category.coverImage}
-                              alt={category.categoryName}
-                              className="w-8 h-8 rounded object-cover"
-                              onError={(e) => {
-                                e.currentTarget.src =
-                                  "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
-                              }}
-                            />
-                            <span className="text-sm font-medium">
-                              {category.categoryName}
-                            </span>
-                          </div>
-                        </label>
+                    <select
+                      value={formData.parentCategoryIds[0] || ""}
+                      onChange={(e) => {
+                        const selectedId = e.target.value
+                          ? [parseInt(e.target.value)]
+                          : [];
+                        handleInputChange("parentCategoryIds", selectedId);
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      required
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Select a parent category</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.isSubCategory ? "↳ " : ""}
+                          {category.categoryName}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                     {formData.isSubCategory &&
                       formData.parentCategoryIds.length === 0 && (
                         <p className="text-sm text-red-500 mt-1">
-                          Please select at least one parent category
+                          Please select a parent category
                         </p>
                       )}
                   </div>
@@ -508,34 +762,130 @@ export default function CategoriesPage() {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 Cover Image
               </h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Image URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.coverImage}
-                  onChange={(e) =>
-                    handleInputChange("coverImage", e.target.value)
-                  }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Enter image URL or leave empty for default"
-                  disabled={isSubmitting}
-                />
-                {formData.coverImage && (
-                  <div className="mt-3">
+
+              {/* Image Upload Method Selection */}
+              <div className="mb-4">
+                <div className="flex space-x-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageUploadMethod("url");
+                      setSelectedFile(null);
+                      setImagePreview("");
+                    }}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                      imageUploadMethod === "url"
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                    }`}
+                    disabled={isSubmitting}
+                  >
+                    <Link className="w-4 h-4" />
+                    <span>Image URL</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageUploadMethod("upload");
+                      handleInputChange("coverImage", "");
+                    }}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                      imageUploadMethod === "upload"
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                    }`}
+                    disabled={isSubmitting}
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Image</span>
+                  </button>
+                </div>
+              </div>
+              {/* Image URL Input */}
+              {imageUploadMethod === "url" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Image URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.coverImage}
+                    onChange={(e) => {
+                      handleInputChange("coverImage", e.target.value);
+                      setImagePreview(e.target.value);
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Enter image URL or leave empty for default"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
+
+              {/* File Upload Input */}
+              {imageUploadMethod === "upload" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload Image
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">
+                      {selectedFile
+                        ? selectedFile.name
+                        : "Click to upload or drag and drop"}
+                    </p>
+                    <p className="text-xs text-gray-500 mb-4">
+                      PNG, JPG, GIF up to 5MB
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="image-upload"
+                      disabled={isSubmitting}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("image-upload")?.click()
+                      }
+                      className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                      disabled={isSubmitting}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span>Choose File</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
+              {(imagePreview || formData.coverImage) && (
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Preview
+                  </label>
+                  <div className="flex items-center space-x-4">
                     <img
-                      src={formData.coverImage}
+                      src={imagePreview || formData.coverImage || DEFAULT_IMAGE}
                       alt="Preview"
                       className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                       onError={(e) => {
-                        e.currentTarget.src =
-                          "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
+                        e.currentTarget.src = DEFAULT_IMAGE;
                       }}
                     />
+                    <div className="text-sm text-gray-600">
+                      <p>This is how your category image will appear</p>
+                      {!imagePreview && !formData.coverImage && (
+                        <p className="text-gray-500 mt-1">
+                          Default image will be used if no image is provided
+                        </p>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Submit Buttons */}
@@ -723,10 +1073,7 @@ export default function CategoriesPage() {
                 Categories
               </h3>
               <p className="text-sm text-gray-600">
-                Showing{" "}
-                {filteredParentCategories.length +
-                  filteredOrphanedSubCategories.length}{" "}
-                of {categories.length} categories
+                Showing {filteredCount} of {categories.length} categories
               </p>
             </div>
           </div>
@@ -743,280 +1090,14 @@ export default function CategoriesPage() {
           </div>
 
           <div className="divide-y divide-gray-200">
-            {/* Render parent categories and their subcategories */}
-            {filteredParentCategories.map((parentCategory) => {
-              const subCategories = getSubCategories(parentCategory.id);
-              const isExpanded = expandedCategories.has(parentCategory.id);
-              const hasVisibleSubCategories =
-                subCategories.some(filterCategory);
-
-              return (
-                <div key={parentCategory.id}>
-                  {/* Parent Category Row */}
-                  <div className="hover:bg-gray-50 transition-colors">
-                    <div className="grid grid-cols-12 gap-4 px-6 py-4 items-center">
-                      <div className="col-span-1">
-                        {subCategories.length > 0 && (
-                          <button
-                            onClick={() =>
-                              toggleCategoryExpansion(parentCategory.id)
-                            }
-                            className="p-1 hover:bg-gray-200 rounded transition-colors"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="w-4 h-4 text-gray-600" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-gray-600" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="col-span-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center">
-                            <img
-                              src={parentCategory.coverImage}
-                              alt={parentCategory.categoryName}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                e.currentTarget.nextElementSibling?.classList.remove(
-                                  "hidden"
-                                );
-                              }}
-                            />
-                            <ImageIcon className="w-4 h-4 text-gray-400 hidden" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-gray-800">
-                              {parentCategory.categoryName}
-                            </h4>
-                            {subCategories.length > 0 && (
-                              <span className="text-xs text-gray-500">
-                                {subCategories.length} sub-categories
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="col-span-3">
-                        <p className="text-sm text-gray-600 line-clamp-2">
-                          {parentCategory.shortDescription}
-                        </p>
-                      </div>
-
-                      <div className="col-span-2">
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                          Parent Category
-                        </span>
-                      </div>
-
-                      <div className="col-span-2">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleViewCategory(parentCategory)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditCategory(parentCategory)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Edit Category"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteCategory(parentCategory.id)
-                            }
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Category"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Sub Categories */}
-                  {isExpanded && subCategories.length > 0 && (
-                    <div className="bg-gray-50">
-                      {subCategories
-                        .filter(filterCategory)
-                        .map((subCategory) => (
-                          <div
-                            key={subCategory.id}
-                            className="hover:bg-gray-100 transition-colors"
-                          >
-                            <div className="grid grid-cols-12 gap-4 px-6 py-3 items-center border-l-4 border-orange-300 ml-8">
-                              <div className="col-span-1"></div>
-
-                              <div className="col-span-4">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-white flex items-center justify-center">
-                                    <img
-                                      src={subCategory.coverImage}
-                                      alt={subCategory.categoryName}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = "none";
-                                        e.currentTarget.nextElementSibling?.classList.remove(
-                                          "hidden"
-                                        );
-                                      }}
-                                    />
-                                    <ImageIcon className="w-3 h-3 text-gray-400 hidden" />
-                                  </div>
-                                  <div>
-                                    <h5 className="font-medium text-gray-800">
-                                      {subCategory.categoryName}
-                                    </h5>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="col-span-3">
-                                <p className="text-sm text-gray-600 line-clamp-1">
-                                  {subCategory.shortDescription}
-                                </p>
-                              </div>
-
-                              <div className="col-span-2">
-                                <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                                  Sub-category
-                                </span>
-                              </div>
-
-                              <div className="col-span-2">
-                                <div className="flex items-center space-x-2">
-                                  <button
-                                    onClick={() =>
-                                      handleViewCategory(subCategory)
-                                    }
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="View Details"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleEditCategory(subCategory)
-                                    }
-                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                    title="Edit Category"
-                                  >
-                                    <Edit className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      handleDeleteCategory(subCategory.id)
-                                    }
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Delete Category"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Render orphaned subcategories */}
-            {filteredOrphanedSubCategories.length > 0 && (
-              <div className="bg-yellow-50">
-                <div className="px-6 py-3 border-l-4 border-yellow-400">
-                  <h4 className="font-medium text-yellow-800">
-                    Orphaned Subcategories
-                  </h4>
-                  <p className="text-xs text-yellow-600">
-                    These subcategories don't have visible parent categories
-                  </p>
-                </div>
-                {filteredOrphanedSubCategories.map((subCategory) => (
-                  <div
-                    key={subCategory.id}
-                    className="hover:bg-yellow-50 transition-colors"
-                  >
-                    <div className="grid grid-cols-12 gap-4 px-6 py-3 items-center border-l-4 border-yellow-300 ml-8">
-                      <div className="col-span-1"></div>
-
-                      <div className="col-span-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-white flex items-center justify-center">
-                            <img
-                              src={subCategory.coverImage}
-                              alt={subCategory.categoryName}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                                e.currentTarget.nextElementSibling?.classList.remove(
-                                  "hidden"
-                                );
-                              }}
-                            />
-                            <ImageIcon className="w-3 h-3 text-gray-400 hidden" />
-                          </div>
-                          <div>
-                            <h5 className="font-medium text-gray-800">
-                              {subCategory.categoryName}
-                            </h5>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="col-span-3">
-                        <p className="text-sm text-gray-600 line-clamp-1">
-                          {subCategory.shortDescription}
-                        </p>
-                      </div>
-
-                      <div className="col-span-2">
-                        <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs font-medium rounded-full">
-                          Sub-category
-                        </span>
-                      </div>
-
-                      <div className="col-span-2">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleViewCategory(subCategory)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditCategory(subCategory)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                            title="Edit Category"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCategory(subCategory.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete Category"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Render category tree */}
+            {filteredCategoryTree.map((category) => (
+              <CategoryTreeItem
+                key={category.id}
+                category={category}
+                level={0}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -1045,8 +1126,7 @@ export default function CategoriesPage() {
       {/* No Search Results */}
       {!loading &&
         categories.length > 0 &&
-        filteredParentCategories.length === 0 &&
-        filteredOrphanedSubCategories.length === 0 && (
+        filteredCategoryTree.length === 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-medium text-gray-800 mb-2">

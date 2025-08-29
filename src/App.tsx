@@ -222,7 +222,17 @@ function App() {
             <Route path="/pos" element={<POSPage />} />
             <Route path="/food" element={<FoodPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/categories/:id" element={<CategoryDetailPage />} />
+            <Route
+              path="/categories/:id"
+              element={
+                <CategoryDetailPage
+                  onBack={() => navigate("/categories")}
+                  onEdit={(id) => console.log("Edit category", id)}
+                  onDelete={(id) => console.log("Delete category", id)}
+                />
+              }
+            />
+
             <Route path="/customer" element={<CustomerPage />} />
             <Route
               path="/delivery-man-list"

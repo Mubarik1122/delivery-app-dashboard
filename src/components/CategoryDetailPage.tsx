@@ -47,10 +47,16 @@ export default function CategoryDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [category, setCategory] = useState<Category | null>(null);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [parentCategories, setParentCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState(mockProducts);
   const [subCategories, setSubCategories] = useState<Category[]>([]);
+
+  // Default demo image
+  const DEFAULT_IMAGE =
+    "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
 
   useEffect(() => {
     if (id) {
@@ -62,20 +68,88 @@ export default function CategoryDetailPage() {
     try {
       setLoading(true);
       setError(null);
-      // In a real app, you would fetch the specific category by ID
-      // For now, we'll fetch all categories and find the one we need
-      const response = await apiService.getAllCategories();
-      const foundCategory = response.data?.find(
-        (cat) => cat.id.toString() === categoryId
-      );
 
-      if (foundCategory) {
-        setCategory(foundCategory);
-        // Fetch products and subcategories for this category
-        setProducts(mockProducts);
-        setSubCategories([]);
+      console.log("Fetching category details for ID:", categoryId);
+
+      const response = await apiService.getAllCategories();
+      console.log("API Response:", response);
+
+      if (response.errorCode === 0 && response.data) {
+        // Map snake_case to camelCase and ensure parentCategoryIds is always an array
+        const mapped = response.data.map((cat: any) => ({
+          id: cat.id,
+          categoryName: cat.category_name || cat.categoryName,
+          shortDescription: cat.short_description || cat.shortDescription,
+          longDescription: cat.long_description || cat.longDescription,
+          isSubCategory: cat.is_sub_category || cat.isSubCategory,
+          coverImage: cat.cover_image || cat.coverImage || DEFAULT_IMAGE,
+          parentCategoryIds: (() => {
+            // Handle different possible structures for parent categories
+            if (Array.isArray(cat.parent_categories)) {
+              return cat.parent_categories.map((p: any) =>
+                typeof p === "object" ? p.id : p
+              );
+            } else if (Array.isArray(cat.parentCategoryIds)) {
+              return cat.parentCategoryIds;
+            } else if (
+              cat.parent_category_ids &&
+              Array.isArray(cat.parent_category_ids)
+            ) {
+              return cat.parent_category_ids;
+            }
+            return [];
+          })(),
+          createdAt: cat.created_at || cat.createdAt,
+          updatedAt: cat.updated_at || cat.updatedAt,
+        }));
+
+        console.log("Mapped categories:", mapped);
+        setAllCategories(mapped);
+
+        // Find the current category
+        const foundCategory = mapped.find(
+          (cat) => cat.id.toString() === categoryId
+        );
+
+        console.log("Found category:", foundCategory);
+
+        if (foundCategory) {
+          setCategory(foundCategory);
+
+          // Find parent categories by IDs
+          if (
+            foundCategory.isSubCategory &&
+            foundCategory.parentCategoryIds?.length > 0
+          ) {
+            console.log(
+              "Finding parents for IDs:",
+              foundCategory.parentCategoryIds
+            );
+            const parents = mapped.filter((cat) =>
+              foundCategory.parentCategoryIds?.includes(cat.id)
+            );
+            console.log("Found parents:", parents);
+            setParentCategories(parents);
+          } else {
+            setParentCategories([]);
+          }
+
+          // Find subcategories for this category
+          const subCats = mapped.filter(
+            (cat) =>
+              cat.isSubCategory &&
+              cat.parentCategoryIds?.includes(foundCategory.id)
+          );
+          console.log("Found subcategories:", subCats);
+          setSubCategories(subCats);
+
+          // Set mock products
+          setProducts(mockProducts);
+        } else {
+          setError("Category not found");
+        }
       } else {
-        setError("Category not found");
+        setError(response.errorMessage || "Failed to load categories");
       }
     } catch (err) {
       console.error("Error fetching category details:", err);
@@ -106,11 +180,21 @@ export default function CategoryDetailPage() {
     }
   };
 
+  const handleViewSubCategory = (subCategory: Category) => {
+    navigate(`/categories/${subCategory.id}`);
+  };
+
+  const handleViewParentCategory = (parentCategory: Category) => {
+    navigate(`/categories/${parentCategory.id}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div>
-        <span className="ml-2 text-gray-600">Loading category details...</span>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <span className="text-gray-600">Loading category details...</span>
+        </div>
       </div>
     );
   }
@@ -246,79 +330,194 @@ export default function CategoryDetailPage() {
           </div>
 
           {/* Parent Categories (for sub-categories) */}
-          {category.isSubCategory &&
-            category.parentCategoryIds &&
-            category.parentCategoryIds.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                  Parent Categories
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {category.parentCategoryIds.map((parentId) => (
-                    <span
-                      key={parentId}
-                      className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full"
-                    >
-                      Parent ID: {parentId}
+          {category.isSubCategory && parentCategories.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                Parent Categories
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {parentCategories.map((parent) => (
+                  <div
+                    key={parent.id}
+                    onClick={() => handleViewParentCategory(parent)}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <div className="flex items-center space-x-3 mb-3">
+                      <img
+                        src={parent.coverImage}
+                        alt={parent.categoryName}
+                        className="w-12 h-12 rounded-lg object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_IMAGE;
+                        }}
+                      />
+                      <div>
+                        <h4 className="font-medium text-gray-800">
+                          {parent.categoryName}
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          {parent.shortDescription}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      Parent Category
                     </span>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Sub Categories Section (for parent categories) */}
-      {!category.isSubCategory && (
+      {/* Sub Categories Section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+            <FolderOpen className="w-6 h-6 text-gray-600" />
+            <span>
+              {category.isSubCategory
+                ? "Related Sub Categories"
+                : "Sub Categories"}
+            </span>
+          </h2>
+          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+            {subCategories.length} items
+          </span>
+        </div>
+
+        {subCategories.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subCategories.map((subCategory) => (
+              <div
+                key={subCategory.id}
+                onClick={() => handleViewSubCategory(subCategory)}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <div className="flex items-center space-x-3 mb-3">
+                  <img
+                    src={subCategory.coverImage}
+                    alt={subCategory.categoryName}
+                    className="w-12 h-12 rounded-lg object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_IMAGE;
+                    }}
+                  />
+                  <div>
+                    <h4 className="font-medium text-gray-800">
+                      {subCategory.categoryName}
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      {subCategory.shortDescription}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="inline-block px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                    Sub Category
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    Click to view details
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">
+              {category.isSubCategory
+                ? "No related sub-categories found"
+                : "No sub-categories found"}
+            </p>
+            <p className="text-sm text-gray-500">
+              {category.isSubCategory
+                ? "Sub-categories with the same parent will appear here"
+                : "Sub-categories will appear here when created"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Show related subcategories for subcategories */}
+      {category.isSubCategory && parentCategories.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
               <FolderOpen className="w-6 h-6 text-gray-600" />
-              <span>Sub Categories</span>
+              <span>Other Sub Categories in Same Parent</span>
             </h2>
-            <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-              {subCategories.length} items
-            </span>
-          </div>
+            {(() => {
+              // Get all subcategories that share the same parent(s) but exclude current category
+              const relatedSubCategories = allCategories.filter(
+                (cat) =>
+                  cat.isSubCategory &&
+                  cat.id !== category.id &&
+                  cat.parentCategoryIds?.some((parentId) =>
+                    category.parentCategoryIds?.includes(parentId)
+                  )
+              );
 
-          {subCategories.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subCategories.map((subCategory) => (
-                <div
-                  key={subCategory.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center space-x-3 mb-3">
-                    <img
-                      src={subCategory.coverImage}
-                      alt={subCategory.categoryName}
-                      className="w-12 h-12 rounded-lg object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src =
-                          "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
-                      }}
-                    />
-                    <div>
-                      <h4 className="font-medium text-gray-800">
-                        {subCategory.categoryName}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {subCategory.shortDescription}
-                      </p>
-                    </div>
+              return (
+                <>
+                  <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                    {relatedSubCategories.length} items
+                  </span>
+
+                  <div className="w-full mt-6">
+                    {relatedSubCategories.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {relatedSubCategories.map((relatedSubCategory) => (
+                          <div
+                            key={relatedSubCategory.id}
+                            onClick={() =>
+                              handleViewSubCategory(relatedSubCategory)
+                            }
+                            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                          >
+                            <div className="flex items-center space-x-3 mb-3">
+                              <img
+                                src={relatedSubCategory.coverImage}
+                                alt={relatedSubCategory.categoryName}
+                                className="w-12 h-12 rounded-lg object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = DEFAULT_IMAGE;
+                                }}
+                              />
+                              <div>
+                                <h4 className="font-medium text-gray-800">
+                                  {relatedSubCategory.categoryName}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  {relatedSubCategory.shortDescription}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                              Related Sub Category
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                        <p className="text-gray-600">
+                          No related sub-categories found
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Other sub-categories with the same parent will appear
+                          here
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">No sub-categories found</p>
-              <p className="text-sm text-gray-500">
-                Sub-categories will appear here when created
-              </p>
-            </div>
-          )}
+                </>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -334,12 +533,7 @@ export default function CategoryDetailPage() {
           </span>
         </div>
 
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-3"></div>
-            <p className="text-gray-600">Loading products...</p>
-          </div>
-        ) : products.length > 0 ? (
+        {products.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map((product) => (
               <div
