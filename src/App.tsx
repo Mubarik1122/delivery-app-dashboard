@@ -34,6 +34,7 @@ import AddVendorPage from "./components/AddVendorPage";
 import CategoriesPage from "./components/CategoriesPage";
 import CategoryDetailPage from "./components/CategoryDetailPage";
 import ItemsPage from "./components/ItemsPage";
+import ItemDetailPage from "./components/ItemDetailPage";
 import {
   Clock,
   CheckCircle,
@@ -224,6 +225,7 @@ function App() {
             <Route path="/food" element={<FoodPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/items" element={<ItemsPage />} />
+            <Route path="/items/:id" element={<ItemDetailPage />} />
             <Route
               path="/categories/:id"
               element={
