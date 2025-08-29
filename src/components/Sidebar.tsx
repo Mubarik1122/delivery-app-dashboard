@@ -161,6 +161,7 @@ export default function Sidebar({
 
     const vendorOnlyItems: MenuItem[] = [
       { id: "categories", label: "Categories", icon: Package },
+      { id: "items", label: "Items", icon: Utensils },
     ];
 
     if (userRole === "admin") {
