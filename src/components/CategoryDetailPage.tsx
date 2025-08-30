@@ -174,9 +174,20 @@ export default function CategoryDetailPage({
     } else {
       navigate("/categories");
     }
+    if (onBack) {
+      onBack();
+    } else {
+      navigate("/categories");
+    }
   };
 
   const handleEdit = (category: Category) => {
+    if (onEdit) {
+      onEdit(category);
+    } else {
+      // Navigate back to categories page with edit mode
+      navigate("/categories", { state: { editCategory: category } });
+    }
     if (onEdit) {
       onEdit(category);
     } else {
@@ -189,6 +200,11 @@ export default function CategoryDetailPage({
     if (window.confirm("Are you sure you want to delete this category?")) {
       try {
         await apiService.deleteCategory({ categoryId });
+        if (onDelete) {
+          onDelete(categoryId);
+        } else {
+          navigate("/categories");
+        }
         if (onDelete) {
           onDelete(categoryId);
         } else {
