@@ -245,9 +245,7 @@ function App() {
             <Route
               path="/add-new-delivery-man"
               element={
-                <AddDeliverymanPage
-                  onBack={() => navigate("/delivery-man-list")}
-                />
+                <AddDeliverymanPage />
               }
             />
             <Route
