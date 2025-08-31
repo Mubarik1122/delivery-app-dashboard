@@ -65,7 +65,6 @@ const foods: Food[] = [
 ];
 
 export default function FoodPage() {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
