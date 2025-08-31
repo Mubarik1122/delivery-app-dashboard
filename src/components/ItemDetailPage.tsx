@@ -63,28 +63,46 @@ export default function ItemDetailPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch all items and filter by ID
+      console.log("Fetching item details for ID:", itemId);
+
       const response = await apiService.getAllItems();
+      console.log("Items API Response:", response);
+
       if (response.errorCode === 0 && response.data) {
-        const foundItem = response.data.items.find(
-          (i) => i.id === Number(itemId)
-        );
+        // Map the API response to ensure consistent structure
+        const mappedItems = response.data.items.map((item: any) => ({
+          id: Number(item.id),
+          itemName: item.item_name || item.itemName,
+          shortDescription:
+            item.short_description || item.shortDescription || "",
+          longDescription: item.long_description || item.longDescription || "",
+          coverImageUrl:
+            item.cover_image_url || item.coverImageUrl || DEFAULT_COVER_IMAGE,
+          backgroundImageUrl:
+            item.background_image_url ||
+            item.backgroundImageUrl ||
+            DEFAULT_BACKGROUND_IMAGE,
+          categoryIds: Array.isArray(item.categories)
+            ? item.categories.map((cat: any) => cat.id)
+            : Array.isArray(item.categoryIds)
+            ? item.categoryIds
+            : [],
+          createdAt: item.created_at || item.createdAt,
+          updatedAt: item.updated_at || item.updatedAt,
+          vendorId: item.vendor_id || item.vendorId,
+        }));
+
+        console.log("Mapped items:", mappedItems);
+        console.log("Looking for item with ID:", Number(itemId));
+
+        const foundItem = mappedItems.find((i) => i.id === Number(itemId));
+        console.log("Found item:", foundItem);
+
         if (foundItem) {
-          setItem({
-            id: foundItem.id,
-            itemName: foundItem.itemName,
-            shortDescription: foundItem.shortDescription,
-            longDescription: foundItem.longDescription,
-            coverImageUrl: foundItem.coverImageUrl || DEFAULT_COVER_IMAGE,
-            backgroundImageUrl:
-              foundItem.backgroundImageUrl || DEFAULT_BACKGROUND_IMAGE,
-            categoryIds: foundItem.categoryIds || [],
-            createdAt: foundItem.createdAt,
-            updatedAt: foundItem.updatedAt,
-            vendorId: foundItem.vendorId,
-          });
+          setItem(foundItem);
         } else {
-          setError("Item not found");
+          console.log("Item not found in mapped items");
+          setError(`Item with ID ${itemId} not found`);
         }
       } else {
         setError(response.errorMessage || "Failed to load item");
