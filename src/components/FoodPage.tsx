@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, Edit, Trash2, Eye, Star, Package, X, Clock, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Food {
   id: string;
@@ -50,6 +51,7 @@ const foods: Food[] = [
 ];
 
 export default function FoodPage() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedFood, setSelectedFood] = useState<Food | null>(null);
@@ -63,7 +65,8 @@ export default function FoodPage() {
   });
 
   const handleViewProduct = (food: Food) => {
-    setSelectedFood(food);
+    // Navigate to item detail page using the food ID
+    navigate(`/items/${food.id}`);
   };
 
   const closeModal = () => {
