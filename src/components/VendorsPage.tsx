@@ -10,10 +10,13 @@ import {
   Mail,
   Phone,
   MapPin,
+  Loader,
+  RefreshCw,
 } from "lucide-react";
+import { apiService, User as ApiUser } from "../services/api";
 
-interface Vendor {
-  id: string;
+interface VendorData {
+  id: number;
   name: string;
   email: string;
   phone: string;
@@ -29,49 +32,61 @@ interface VendorsPageProps {
   onAddVendor: () => void;
 }
 
-const sampleVendors: Vendor[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john@pizzapalace.com",
-    phone: "+1234567890",
-    address: "123 Main St, City, State",
-    restaurantName: "Pizza Palace",
-    joinDate: "2024-01-15",
-    status: "active",
-    totalOrders: 245,
-    revenue: 12500.0,
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah@burgerhouse.com",
-    phone: "+1234567891",
-    address: "456 Oak Ave, City, State",
-    restaurantName: "Burger House",
-    joinDate: "2024-02-20",
-    status: "active",
-    totalOrders: 189,
-    revenue: 8900.5,
-  },
-  {
-    id: "3",
-    name: "Mike Chen",
-    email: "mike@asianfusion.com",
-    phone: "+1234567892",
-    address: "789 Pine Rd, City, State",
-    restaurantName: "Asian Fusion",
-    joinDate: "2024-03-10",
-    status: "inactive",
-    totalOrders: 67,
-    revenue: 3200.75,
-  },
-];
 
 export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
-  const [vendors, setVendors] = useState<Vendor[]>(sampleVendors);
+  const [vendors, setVendors] = useState<VendorData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<VendorData | null>(null);
+
+  useEffect(() => {
+    loadVendors();
+  }, []);
+
+  const loadVendors = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await apiService.getUsers();
+
+      if (response.errorCode === 0 && response.data) {
+        // Filter only users with role 'Vendor'
+        const vendorUsers = response.data.filter(
+          (user) => user.role_name === "Vendor"
+        );
+
+        // Map API data to component format
+        const mappedVendors: VendorData[] = vendorUsers.map((vendor) => ({
+          id: vendor.id,
+          name: `${vendor.first_name} ${vendor.last_name}`,
+          email: vendor.email_address,
+          phone: vendor.phone_number,
+          address: `${vendor.street_address1}${
+            vendor.street_address2 ? ", " + vendor.street_address2 : ""
+          }, ${vendor.city}, ${vendor.state} ${vendor.zip_code}`,
+          restaurantName: vendor.restaurant_name || "Restaurant",
+          joinDate: vendor.created_at
+            ? new Date(vendor.created_at).toLocaleDateString()
+            : "N/A",
+          status: vendor.is_active !== false ? "active" : "inactive",
+          totalOrders: 0, // These would come from order statistics API
+          revenue: 0,
+        }));
+
+        setVendors(mappedVendors);
+      } else {
+        setError(response.errorMessage || "Failed to load vendors");
+      }
+    } catch (error) {
+      console.error("Error loading vendors:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to load vendors"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredVendors = vendors.filter(
     (vendor) =>
@@ -80,10 +95,31 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
       vendor.restaurantName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleViewVendor = (vendor: Vendor) => {
+  const handleViewVendor = (vendor: VendorData) => {
     setSelectedVendor(vendor);
   };
 
+  const handleDeleteVendor = async (vendorId: number) => {
+    if (
+      !confirm(
+        "Are you sure you want to delete this vendor? This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await apiService.deleteUser(vendorId);
+      setVendors((prev) => prev.filter((vendor) => vendor.id !== vendorId));
+    } catch (error) {
+      console.error("Error deleting vendor:", error);
+      setError("Failed to delete vendor");
+    }
+  };
+
+  const handleRefresh = () => {
+    loadVendors();
+  };
   const closeModal = () => {
     setSelectedVendor(null);
   };
@@ -102,18 +138,37 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                 Manage restaurant vendors and partners
               </p>
             </div>
-            <button
-              onClick={onAddVendor}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add Vendor</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                />
+                <span>Refresh</span>
+              </button>
+              <button
+                onClick={onAddVendor}
+                className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Vendor</span>
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 hidden gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -171,12 +226,33 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
           </div>
         </div>
 
-        {/* Vendors Table */}
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800">All Vendors</h3>
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <Loader className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
+            <h3 className="text-lg font-medium text-gray-800 mb-2">
+              Loading Vendors
+            </h3>
+            <p className="text-gray-600">
+              Please wait while we fetch the vendor list...
+            </p>
           </div>
-          <div className="overflow-x-auto">
+        )}
+
+        {/* Vendors Table */}
+        {!loading && (
+          <div className="bg-white rounded-xl border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">All Vendors</h3>
+              <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
+                {filteredVendors.length}
+              </span>
+            </div>
+          </div>
+          
+          {vendors.length > 0 ? (
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -238,7 +314,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(vendor.joinDate).toLocaleDateString()}
+                      {vendor.joinDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {vendor.totalOrders}
@@ -269,6 +345,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button className="text-red-600 hover:text-red-800">
+                          onClick={() => handleDeleteVendor(vendor.id)}
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -277,8 +354,33 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                 ))}
               </tbody>
             </table>
+            </div>
+          ) : (
+            !loading && (
+              <div className="text-center py-12">
+                <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-medium text-gray-800 mb-2">
+                  No Vendors Found
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  {searchTerm
+                    ? "No vendors match your current search."
+                    : "Get started by adding your first vendor."}
+                </p>
+                {!searchTerm && (
+                  <button
+                    onClick={onAddVendor}
+                    className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 mx-auto"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>Add Your First Vendor</span>
+                  </button>
+                )}
+              </div>
+            )
+          )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Vendor Detail Modal */}
@@ -374,7 +476,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Join Date:</span>
                       <span className="font-medium">
-                        {new Date(selectedVendor.joinDate).toLocaleDateString()}
+                        {selectedVendor.joinDate}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -397,9 +499,6 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
               <div className="flex space-x-3">
                 <button className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium">
                   Edit Vendor
-                </button>
-                <button className="flex-1 hidden bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium">
-                  View Orders
                 </button>
                 <button
                   onClick={closeModal}

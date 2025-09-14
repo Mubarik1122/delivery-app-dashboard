@@ -129,7 +129,15 @@ export default function ItemDetailPage() {
   };
 
   const handleEdit = () => {
-    navigate("/items", { state: { editItem: item } });
+    // Navigate to items page and trigger edit mode
+    if (item) {
+      navigate("/items", { 
+        state: { 
+          editItem: item,
+          shouldEdit: true 
+        } 
+      });
+    }
   };
 
   const handleDelete = async () => {

@@ -25,10 +25,11 @@ import {
   UpdateItemRequest,
   Category,
 } from "../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function ItemsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +72,15 @@ export default function ItemsPage() {
     loadCategories();
   }, []);
 
+  // Handle navigation state for editing
+  useEffect(() => {
+    if (location.state?.editItem && location.state?.shouldEdit) {
+      const itemToEdit = location.state.editItem;
+      handleEditItem(itemToEdit);
+      // Clear the state to prevent re-triggering
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state]);
   const loadItems = async () => {
     try {
       setLoading(true);
@@ -438,7 +448,7 @@ export default function ItemsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Categories *
               </label>
-              <div className="border border-gray-300 rounded-lg p-4 max-h-48 overflow-y-auto">
+              <div className="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto bg-white">
                 {categories.length === 0 ? (
                   <p className="text-gray-500 text-center py-4">
                     No categories available
@@ -448,25 +458,104 @@ export default function ItemsPage() {
                     {categories.map((category) => (
                       <label
                         key={category.id}
-                        className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                        className={`flex items-center space-x-3 cursor-pointer p-3 rounded-lg border transition-all ${
+                          formData.categoryIds.includes(category.id)
+                            ? 'bg-red-50 border-red-200 shadow-sm'
+                            : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={formData.categoryIds.includes(category.id)}
                           onChange={() => handleCategoryToggle(category.id)}
-                          className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                          className="w-5 h-5 text-red-600 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
                           disabled={isSubmitting}
                         />
                         <img
                           src={category.coverImage}
                           alt={category.categoryName}
-                          className="w-8 h-8 rounded object-cover"
+                          className="w-10 h-10 rounded-lg object-cover border border-gray-200"
                           onError={(e) => {
                             e.currentTarget.src = DEFAULT_COVER_IMAGE;
                           }}
                         />
                         <div className="flex-1">
-                          <span className="text-sm font-medium text-gray-800">
+                          <div className="flex items-center space-x-2">
+                            <span className={`font-medium ${
+                              formData.categoryIds.includes(category.id)
+                                ? 'text-red-700'
+                                : 'text-gray-800'
+                            }`}>
+                              {category.isSubCategory ? "↳ " : ""}
+                              {category.categoryName}
+                            </span>
+                            <span
+                              className={`px-2 py-1 text-xs rounded-full ${
+                                category.isSubCategory
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {category.isSubCategory ? "Sub" : "Parent"}
+                            </span>
+                          </div>
+                          <p className={`text-xs mt-1 ${
+                            formData.categoryIds.includes(category.id)
+                              ? 'text-red-600'
+                              : 'text-gray-500'
+                          }`}>
+                            {category.shortDescription}
+                          </p>
+                        </div>
+                        {formData.categoryIds.includes(category.id) && (
+                          <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Selected Categories Summary */}
+              {formData.categoryIds.length > 0 && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm font-medium text-green-800 mb-2">
+                    Selected Categories ({formData.categoryIds.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.categoryIds.map((categoryId) => {
+                      const category = categories.find((cat) => cat.id === categoryId);
+                      return category ? (
+                        <span
+                          key={categoryId}
+                          className="inline-flex items-center space-x-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium"
+                        >
+                          <span>{category.categoryName}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCategoryToggle(categoryId)}
+                            className="ml-1 hover:bg-green-200 rounded-full p-0.5"
+                            disabled={isSubmitting}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {formData.categoryIds.length === 0 && (
+                <p className="text-sm text-red-500 mt-2">
+                  Please select at least one category
+                </p>
+              )}
+            </div>
                             {category.isSubCategory ? "↳ " : ""}
                             {category.categoryName}
                           </span>
