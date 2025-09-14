@@ -559,7 +559,7 @@ export default function CategoryDetailPage({
       )}
 
       {/* Products Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
             <Package className="w-6 h-6 text-gray-600" />
@@ -622,7 +622,7 @@ export default function CategoryDetailPage({
             </p>
           </div>
         )}
-      </div>
+      </div> */}
     </div>
   );
 }

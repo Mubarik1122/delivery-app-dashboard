@@ -864,41 +864,36 @@ export default function CategoriesPage() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex space-x-4 pt-6">
-              <button
-                type="submit"
-                disabled={
-                  isSubmitting ||
-                  (formData.isSubCategory &&
-                    formData.parentCategoryIds.length === 0)
-                }
-                className="bg-red-500 text-white px-8 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <Loader className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Save className="w-5 h-5" />
-                )}
-                <span>
-                  {isSubmitting
-                    ? editingCategory
-                      ? "Updating..."
-                      : "Creating..."
-                    : editingCategory
-                    ? "Update Category"
-                    : "Create Category"}
-                </span>
-              </button>
+            <div className="flex items-center justify-end space-x-4">
               <button
                 type="button"
                 onClick={() => {
                   setShowAddForm(false);
                   resetForm();
                 }}
+                className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 disabled={isSubmitting}
-                className="bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
               >
                 Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-3 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>
+                      {editingCategory ? "Update Category" : "Create Category"}
+                    </span>
+                  </>
+                )}
               </button>
             </div>
           </form>

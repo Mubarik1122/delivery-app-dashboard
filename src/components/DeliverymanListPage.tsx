@@ -59,7 +59,7 @@ export default function DeliverymanListPage() {
       if (response.errorCode === 0 && response.data) {
         // Filter only users with role 'driver'
         const drivers = response.data.filter(
-          (user) => user.role_name === "Driver"
+          (user) => user.role_name === "Rider"
         );
 
         // Map API data to component format
