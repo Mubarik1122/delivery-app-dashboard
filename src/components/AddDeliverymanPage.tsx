@@ -57,7 +57,7 @@ export default function AddDeliverymanPage() {
 
     try {
       const requestData: CreateUserRequest = {
-        role_name: "driver", // Always set to driver
+        role_name: "Driver", // Always set to driver
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         phone_number: formData.phone_number.trim(),

@@ -222,8 +222,7 @@ export default function LoginPage({
             </button>
           </form>
 
-          {/* Signup link */}
-          <div className="mt-6 text-center">
+          {/*   <div className="mt-6 text-center">
             <span className="text-gray-600">Don't have an account? </span>
             <button
               type="button"
@@ -233,6 +232,8 @@ export default function LoginPage({
               Sign up
             </button>
           </div>
+          
+          Signup link */}
         </div>
       </div>
     </div>
