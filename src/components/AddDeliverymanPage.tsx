@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import Swal from "sweetalert2";
 import {
   User,
   Mail,
@@ -57,7 +58,7 @@ export default function AddDeliverymanPage() {
 
     try {
       const requestData: CreateUserRequest = {
-        role_name: "Driver", // Always set to driver
+        role_name: "Rider", // Always set to driver
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         phone_number: formData.phone_number.trim(),
@@ -80,16 +81,30 @@ export default function AddDeliverymanPage() {
       if (response && response.errorCode === 0) {
         // Success - navigate back to list
         navigate("/delivery-man-list");
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: "Delivery driver created successfully",
+          timer: 2000,
+          showConfirmButton: false,
+        });
       } else {
-        setError(response?.errorMessage || "Failed to create delivery driver");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response?.errorMessage || "Failed to create delivery driver",
+        });
       }
     } catch (error) {
       console.error("Error creating delivery driver:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to create delivery driver"
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to create delivery driver",
+      });
     } finally {
       setIsSubmitting(false);
     }

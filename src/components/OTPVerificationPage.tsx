@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ArrowLeft, Mail, RefreshCw, Utensils } from "lucide-react";
+import Swal from "sweetalert2";
 import { apiService } from "../services/api";
 
 interface OTPVerificationPageProps {
@@ -77,13 +78,21 @@ export default function OTPVerificationPage({
         localStorage.setItem("auth_token", response.data.token);
         onVerified(response.data.token, response.data.user);
       } else {
-        setError(response.errorMessage || "Invalid OTP");
+        Swal.fire({
+          icon: "error",
+          title: "Verification Failed",
+          text: response.errorMessage || "Invalid OTP",
+        });
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
     } catch (error) {
       const errorMessage = error.message || "Verification failed";
-      setError(errorMessage);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: errorMessage,
+      });
       setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } finally {
@@ -104,10 +113,18 @@ export default function OTPVerificationPage({
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       } else {
-        setError(response.message || "Failed to resend OTP");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.message || "Failed to resend OTP",
+        });
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to resend OTP");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error instanceof Error ? error.message : "Failed to resend OTP",
+      });
     } finally {
       setIsResending(false);
     }

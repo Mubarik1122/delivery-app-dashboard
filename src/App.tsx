@@ -225,7 +225,11 @@ function App() {
             <Route path="/food" element={<FoodPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/items" element={<ItemsPage />} />
+            <Route path="/items/new" element={<ItemsPage />} />
+            <Route path="/items/update" element={<ItemsPage />} />
             <Route path="/items/:id" element={<ItemDetailPage />} />
+            <Route path="/categories/new" element={<CategoriesPage />} />
+            <Route path="/categories/update" element={<CategoriesPage />} />
             <Route
               path="/categories/:id"
               element={
@@ -236,7 +240,6 @@ function App() {
                 />
               }
             />
-
             <Route path="/customer" element={<CustomerPage />} />
             <Route
               path="/delivery-man-list"
@@ -257,11 +260,11 @@ function App() {
             <Route
               path="/vendors"
               element={
-                <VendorsPage onAddVendor={() => navigate("/vendors/add")} />
+                <VendorsPage onAddVendor={() => navigate("/vendors/new")} />
               }
             />
             <Route
-              path="/vendors/add"
+              path="/vendors/new"
               element={<AddVendorPage onBack={() => navigate("/vendors")} />}
             />
             <Route

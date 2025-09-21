@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Swal from "sweetalert2";
 import {
   Search,
   Plus,
@@ -96,11 +97,14 @@ export default function DeliverymanListPage() {
       }
     } catch (error) {
       console.error("Error loading delivery drivers:", error);
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load delivery drivers"
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to load delivery drivers",
+      });
     } finally {
       setLoading(false);
     }
@@ -126,27 +130,46 @@ export default function DeliverymanListPage() {
       );
     } catch (error) {
       console.error("Error updating driver status:", error);
-      setError("Failed to update driver status");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to update driver status",
+      });
     } finally {
       setIsUpdatingStatus(null);
     }
   };
 
   const handleDeleteDriver = async (driverId: number) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this delivery driver? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await apiService.deleteUser(driverId);
       setDeliverymen((prev) => prev.filter((driver) => driver.id !== driverId));
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: "Delivery driver has been deleted.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error) {
       console.error("Error deleting driver:", error);
-      setError("Failed to delete driver");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete driver",
+      });
     }
   };
 

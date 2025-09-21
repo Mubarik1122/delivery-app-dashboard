@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Mail, ArrowLeft, CheckCircle, ShieldCheck } from "lucide-react";
+import Swal from "sweetalert2";
 import { apiService } from "../services/api";
 
 interface ForgotPasswordPageProps {
@@ -34,14 +35,21 @@ export default function ForgotPasswordPage({
         setOtpDigits(Array(6).fill(""));
         console.log("OTP:", response.data?.otp); // 🔒 Remove in production
       } else {
-        setError(
-          response.errorMessage ||
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text:
+            response.errorMessage ||
             response.data?.message ||
-            "Failed to send OTP"
-        );
+            "Failed to send OTP",
+        });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err instanceof Error ? err.message : "An error occurred",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -60,12 +68,19 @@ export default function ForgotPasswordPage({
       if (response.errorCode === 0 && response.data?.verified) {
         setIsVerified(true);
       } else {
-        setError(
-          response.errorMessage || response.data?.message || "Invalid OTP"
-        );
+        Swal.fire({
+          icon: "error",
+          title: "Verification Failed",
+          text:
+            response.errorMessage || response.data?.message || "Invalid OTP",
+        });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err instanceof Error ? err.message : "Verification failed",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -95,11 +110,26 @@ export default function ForgotPasswordPage({
         setSuccessMessage(
           response.data?.message || "Password reset successfully."
         );
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: response.data?.message || "Password reset successfully.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
       } else {
-        setError(response.errorMessage || "Failed to reset password.");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.errorMessage || "Failed to reset password.",
+        });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err instanceof Error ? err.message : "Something went wrong",
+      });
     } finally {
       setIsLoading(false);
     }

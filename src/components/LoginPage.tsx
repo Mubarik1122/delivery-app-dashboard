@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, Utensils } from "lucide-react";
+import Swal from "sweetalert2";
 import { apiService } from "../services/api";
 
 export interface LoginPageProps {
@@ -57,7 +58,11 @@ export default function LoginPage({
         ) {
           onOTPRequired(email);
         } else {
-          setError(errorMsg);
+          Swal.fire({
+            icon: "error",
+            title: "Login Failed",
+            text: errorMsg,
+          });
         }
       }
     } catch (error: any) {
@@ -69,10 +74,13 @@ export default function LoginPage({
       ) {
         onOTPRequired(email);
       } else {
-        setError(
-          error.message ||
-            "Network error. Please check your connection and try again."
-        );
+        Swal.fire({
+          icon: "error",
+          title: "Login Error",
+          text:
+            error.message ||
+            "Network error. Please check your connection and try again.",
+        });
       }
     } finally {
       setIsLoading(false);
@@ -223,7 +231,7 @@ export default function LoginPage({
           </form>
 
           {/* Signup link */}
-          <div className="mt-6 text-center">
+          {/* <div className="mt-6 text-center">
             <span className="text-gray-600">Don't have an account? </span>
             <button
               type="button"
@@ -232,7 +240,7 @@ export default function LoginPage({
             >
               Sign up
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

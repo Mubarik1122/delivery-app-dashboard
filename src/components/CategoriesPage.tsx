@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   Search,
   Plus,
@@ -28,10 +30,10 @@ import {
   CreateUpdateCategoryRequest,
   UpdateCategoryRequest,
 } from "../services/api";
-import { useNavigate } from "react-router-dom";
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,6 +58,31 @@ export default function CategoriesPage() {
     isSubCategory: false,
     coverImage: "",
   });
+
+  // Check if we're in add or edit mode based on URL
+  const isAddMode = location.pathname === "/categories/new";
+  const isEditMode = location.pathname === "/categories/update";
+
+  useEffect(() => {
+    // Handle edit mode from location state
+    if (isEditMode && location.state?.editCategory) {
+      const category = location.state.editCategory;
+      setFormData({
+        categoryName: category.categoryName,
+        shortDescription: category.shortDescription,
+        longDescription: category.longDescription,
+        parentCategoryIds: category.parentCategoryIds || [],
+        isSubCategory: category.isSubCategory,
+        coverImage: category.coverImage,
+      });
+      setImagePreview(category.coverImage);
+      setEditingCategory(category);
+      setShowAddForm(true);
+    } else if (isAddMode) {
+      resetForm();
+      setShowAddForm(true);
+    }
+  }, [location, isAddMode, isEditMode]);
 
   // Load categories on component mount
   useEffect(() => {
@@ -92,9 +119,12 @@ export default function CategoriesPage() {
       }
     } catch (error) {
       console.error("Error loading categories:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to load categories"
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error instanceof Error ? error.message : "Failed to load categories",
+      });
     } finally {
       setLoading(false);
     }
@@ -288,7 +318,7 @@ export default function CategoriesPage() {
                       level > 0 ? "text-sm" : ""
                     }`}
                   >
-                    {"↳ ".repeat(level)}
+                    {"".repeat(level)}
                     {category.categoryName}
                   </h4>
                   {hasChildren && (
@@ -444,9 +474,6 @@ export default function CategoriesPage() {
       coverImage: category.coverImage,
     });
     setImagePreview(category.coverImage);
-    if (category.coverImage && category.coverImage !== DEFAULT_IMAGE) {
-      setImageUploadMethod("url");
-    }
     setEditingCategory(category);
     setShowAddForm(true);
   };
@@ -489,23 +516,38 @@ export default function CategoriesPage() {
       if (response && response.errorCode === 0) {
         await loadCategories();
         setShowAddForm(false);
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: `Category ${
+            editingCategory ? "updated" : "created"
+          } successfully`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
         resetForm();
       } else {
-        setError(
-          response?.errorMessage ||
-            `Failed to ${editingCategory ? "update" : "create"} category`
-        );
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text:
+            response?.errorMessage ||
+            `Failed to ${editingCategory ? "update" : "create"} category`,
+        });
       }
     } catch (error) {
       console.error(
         `Error ${editingCategory ? "updating" : "creating"} category:`,
         error
       );
-      setError(
-        error instanceof Error
-          ? error.message
-          : `Failed to ${editingCategory ? "update" : "create"} category`
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error instanceof Error
+            ? error.message
+            : `Failed to ${editingCategory ? "update" : "create"} category`,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -523,23 +565,67 @@ export default function CategoriesPage() {
   };
 
   const handleDeleteCategory = async (categoryId: number) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this category? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
-      setError("");
-      await apiService.deleteCategory({ categoryId });
-      await loadCategories();
+      const categoryToDelete = categories.find((cat) => cat.id === categoryId);
+
+      if (!categoryToDelete) {
+        throw new Error("Category not found");
+      }
+
+      let deletePayload;
+
+      if (
+        categoryToDelete.isSubCategory &&
+        categoryToDelete.parentCategoryIds?.length > 0
+      ) {
+        // For subcategories: use subcategoryId and parentCategoryId
+        deletePayload = {
+          subcategoryId: categoryId,
+          parentCategoryId: categoryToDelete.parentCategoryIds[0],
+        };
+      } else {
+        // For parent categories: use only categoryId
+        deletePayload = {
+          categoryId: categoryId,
+        };
+      }
+
+      console.log("Deleting category with payload:", deletePayload);
+
+      const response = await apiService.deleteCategory(deletePayload);
+
+      if (response.success) {
+        await loadCategories();
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: "Category has been deleted.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        throw new Error(response.message || "Failed to delete category");
+      }
     } catch (error) {
       console.error("Error deleting category:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to delete category"
-      );
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text:
+          error instanceof Error ? error.message : "Failed to delete category",
+      });
     }
   };
 
@@ -567,7 +653,7 @@ export default function CategoriesPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setShowAddForm(false);
+                  navigate("/categories");
                   resetForm();
                 }}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
@@ -716,7 +802,7 @@ export default function CategoriesPage() {
                       <option value="">Select a parent category</option>
                       {categories.map((category) => (
                         <option key={category.id} value={category.id}>
-                          {category.isSubCategory ? "↳ " : ""}
+                          {category.isSubCategory ? "" : ""}
                           {category.categoryName}
                         </option>
                       ))}
@@ -1108,7 +1194,7 @@ export default function CategoriesPage() {
             </p>
             <button
               onClick={() => {
-                setSearchTerm("");
+                setShowAddForm(false);
                 setFilterType("all");
               }}
               className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"

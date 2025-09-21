@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   ArrowLeft,
   Edit,
@@ -129,20 +130,44 @@ export default function ItemDetailPage() {
   };
 
   const handleEdit = () => {
-    navigate("/items", { state: { editItem: item } });
+    // Navigate to items page and trigger edit mode
+    if (item) {
+      navigate("/items/update", { state: { editItem: item } });
+    }
   };
 
   const handleDelete = async () => {
     if (!item) return;
 
-    if (window.confirm("Are you sure you want to delete this item?")) {
-      try {
-        await apiService.deleteItem(item.id);
-        navigate("/items");
-      } catch (err) {
-        console.error("Error deleting item:", err);
-        alert("Failed to delete item");
-      }
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await apiService.deleteItem(item.id);
+      navigate("/items");
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: "Item has been deleted.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error deleting item:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete item",
+      });
     }
   };
 
@@ -185,7 +210,7 @@ export default function ItemDetailPage() {
           <img
             src={item.backgroundImageUrl}
             alt={item.itemName}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             onError={(e) => {
               e.currentTarget.src = DEFAULT_BACKGROUND_IMAGE;
             }}

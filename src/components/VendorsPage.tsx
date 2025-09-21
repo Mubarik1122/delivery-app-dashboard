@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   Search,
   Plus,
@@ -10,10 +12,13 @@ import {
   Mail,
   Phone,
   MapPin,
+  Loader,
+  RefreshCw,
 } from "lucide-react";
+import { apiService, User as ApiUser } from "../services/api";
 
-interface Vendor {
-  id: string;
+interface VendorData {
+  id: number;
   name: string;
   email: string;
   phone: string;
@@ -29,49 +34,63 @@ interface VendorsPageProps {
   onAddVendor: () => void;
 }
 
-const sampleVendors: Vendor[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john@pizzapalace.com",
-    phone: "+1234567890",
-    address: "123 Main St, City, State",
-    restaurantName: "Pizza Palace",
-    joinDate: "2024-01-15",
-    status: "active",
-    totalOrders: 245,
-    revenue: 12500.0,
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah@burgerhouse.com",
-    phone: "+1234567891",
-    address: "456 Oak Ave, City, State",
-    restaurantName: "Burger House",
-    joinDate: "2024-02-20",
-    status: "active",
-    totalOrders: 189,
-    revenue: 8900.5,
-  },
-  {
-    id: "3",
-    name: "Mike Chen",
-    email: "mike@asianfusion.com",
-    phone: "+1234567892",
-    address: "789 Pine Rd, City, State",
-    restaurantName: "Asian Fusion",
-    joinDate: "2024-03-10",
-    status: "inactive",
-    totalOrders: 67,
-    revenue: 3200.75,
-  },
-];
-
 export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
-  const [vendors, setVendors] = useState<Vendor[]>(sampleVendors);
+  const navigate = useNavigate();
+  const [vendors, setVendors] = useState<VendorData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<VendorData | null>(null);
+
+  useEffect(() => {
+    loadVendors();
+  }, []);
+
+  const loadVendors = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await apiService.getUsers();
+
+      if (response.errorCode === 0 && response.data) {
+        // Filter only users with role 'Vendor'
+        const vendorUsers = response.data.filter(
+          (user) => user.role_name === "Vendor"
+        );
+
+        // Map API data to component format
+        const mappedVendors: VendorData[] = vendorUsers.map((vendor) => ({
+          id: vendor.id,
+          name: `${vendor.first_name} ${vendor.last_name}`,
+          email: vendor.email_address,
+          phone: vendor.phone_number,
+          address: `${vendor.street_address1}${
+            vendor.street_address2 ? ", " + vendor.street_address2 : ""
+          }, ${vendor.city}, ${vendor.state} ${vendor.zip_code}`,
+          restaurantName: vendor.restaurant_name || "Restaurant",
+          joinDate: vendor.created_at
+            ? new Date(vendor.created_at).toLocaleDateString()
+            : "N/A",
+          status: vendor.is_active !== false ? "active" : "inactive",
+          totalOrders: 0, // These would come from order statistics API
+          revenue: 0,
+        }));
+
+        setVendors(mappedVendors);
+      } else {
+        setError(response.errorMessage || "Failed to load vendors");
+      }
+    } catch (error) {
+      console.error("Error loading vendors:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error instanceof Error ? error.message : "Failed to load vendors",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredVendors = vendors.filter(
     (vendor) =>
@@ -80,10 +99,46 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
       vendor.restaurantName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleViewVendor = (vendor: Vendor) => {
+  const handleViewVendor = (vendor: VendorData) => {
     setSelectedVendor(vendor);
   };
 
+  const handleDeleteVendor = async (vendorId: number) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await apiService.deleteUser(vendorId);
+      setVendors((prev) => prev.filter((vendor) => vendor.id !== vendorId));
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: "Vendor has been deleted.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error deleting vendor:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete vendor",
+      });
+    }
+  };
+
+  const handleRefresh = () => {
+    loadVendors();
+  };
   const closeModal = () => {
     setSelectedVendor(null);
   };
@@ -102,18 +157,37 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                 Manage restaurant vendors and partners
               </p>
             </div>
-            <button
-              onClick={onAddVendor}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add Vendor</span>
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                />
+                <span>Refresh</span>
+              </button>
+              <button
+                onClick={onAddVendor}
+                className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Vendor</span>
+              </button>
+            </div>
           </div>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 hidden gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -142,7 +216,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
             </div>
           </div>
 
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
+          {/* <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold text-orange-600">
@@ -154,7 +228,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                 <Building className="w-6 h-6 text-orange-600" />
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Search */}
@@ -171,114 +245,165 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
           </div>
         </div>
 
-        {/* Vendors Table */}
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800">All Vendors</h3>
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <Loader className="w-8 h-8 text-gray-400 mx-auto mb-4 animate-spin" />
+            <h3 className="text-lg font-medium text-gray-800 mb-2">
+              Loading Vendors
+            </h3>
+            <p className="text-gray-600">
+              Please wait while we fetch the vendor list...
+            </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Restaurant
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Join Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Orders
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredVendors.map((vendor) => (
-                  <tr key={vendor.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-500" />
-                        </div>
-                        <div>
+        )}
+
+        {/* Vendors Table */}
+        {!loading && (
+          <div className="bg-white rounded-xl border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  All Vendors
+                </h3>
+                <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-sm font-medium">
+                  {filteredVendors.length}
+                </span>
+              </div>
+            </div>
+
+            {vendors.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Vendor
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Restaurant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Contact
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Join Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Orders
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Revenue
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredVendors.map((vendor) => (
+                      <tr key={vendor.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-gray-500" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {vendor.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {vendor.email}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {vendor.name}
+                            {vendor.restaurantName}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {vendor.email}
+                            {vendor.address}
                           </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {vendor.restaurantName}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {vendor.address}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {vendor.phone}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(vendor.joinDate).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {vendor.totalOrders}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${vendor.revenue.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          vendor.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {vendor.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewVendor(vendor)}
-                          className="text-blue-600 hover:text-blue-800"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="text-green-600 hover:text-green-800">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="text-red-600 hover:text-red-800">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {vendor.phone}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {vendor.joinDate}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {vendor.totalOrders}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ${vendor.revenue.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              vendor.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {vendor.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleViewVendor(vendor)}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button className="text-green-600 hover:text-green-800">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteVendor(vendor.id)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              !loading && (
+                <div className="text-center py-12">
+                  <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-gray-800 mb-2">
+                    No Vendors Found
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {searchTerm
+                      ? "No vendors match your current search."
+                      : "Get started by adding your first vendor."}
+                  </p>
+                  {!searchTerm && (
+                    <button
+                      onClick={onAddVendor}
+                      className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 mx-auto"
+                    >
+                      <Plus className="w-5 h-5" />
+                      <span>Add Your First Vendor</span>
+                    </button>
+                  )}
+                </div>
+              )
+            )}
           </div>
-        </div>
+        )}
       </div>
 
       {/* Vendor Detail Modal */}
@@ -374,21 +499,21 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                     <div className="flex justify-between">
                       <span className="text-gray-600">Join Date:</span>
                       <span className="font-medium">
-                        {new Date(selectedVendor.joinDate).toLocaleDateString()}
+                        {selectedVendor.joinDate}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    {/* <div className="flex justify-between">
                       <span className="text-gray-600">Total Orders:</span>
                       <span className="font-medium">
                         {selectedVendor.totalOrders}
                       </span>
-                    </div>
-                    <div className="flex justify-between">
+                    </div> */}
+                    {/* <div className="flex justify-between">
                       <span className="text-gray-600">Total Revenue:</span>
                       <span className="font-medium text-green-600">
                         ${selectedVendor.revenue.toFixed(2)}
                       </span>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
@@ -397,9 +522,6 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
               <div className="flex space-x-3">
                 <button className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium">
                   Edit Vendor
-                </button>
-                <button className="flex-1 hidden bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors font-medium">
-                  View Orders
                 </button>
                 <button
                   onClick={closeModal}

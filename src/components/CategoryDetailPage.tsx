@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   ArrowLeft,
   Edit,
@@ -186,34 +187,70 @@ export default function CategoryDetailPage({
       onEdit(category);
     } else {
       // Navigate back to categories page with edit mode
-      navigate("/categories", { state: { editCategory: category } });
-    }
-    if (onEdit) {
-      onEdit(category);
-    } else {
-      // Navigate back to categories page with edit mode
-      navigate("/categories", { state: { editCategory: category } });
+      navigate("/categories/update", { state: { editCategory: category } });
     }
   };
 
   const handleDelete = async (categoryId: number) => {
-    if (window.confirm("Are you sure you want to delete this category?")) {
-      try {
-        await apiService.deleteCategory({ categoryId });
-        if (onDelete) {
-          onDelete(categoryId);
-        } else {
-          navigate("/categories");
-        }
-        if (onDelete) {
-          onDelete(categoryId);
-        } else {
-          navigate("/categories");
-        }
-      } catch (err) {
-        console.error("Error deleting category:", err);
-        alert("Failed to delete category");
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      if (!category) {
+        throw new Error("Category not found");
       }
+
+      let deletePayload;
+
+      if (category.isSubCategory && category.parentCategoryIds?.length > 0) {
+        // For subcategories: use subcategoryId and parentCategoryId
+        deletePayload = {
+          subcategoryId: categoryId,
+          parentCategoryId: category.parentCategoryIds[0],
+        };
+      } else {
+        // For parent categories: use only categoryId
+        deletePayload = {
+          categoryId: categoryId,
+        };
+      }
+
+      console.log("Deleting category with payload:", deletePayload);
+
+      const response = await apiService.deleteCategory(deletePayload);
+
+      if (response.success) {
+        if (onDelete) {
+          onDelete(categoryId);
+        } else {
+          navigate("/categories");
+        }
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: "Category has been deleted.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        throw new Error(response.message || "Failed to delete category");
+      }
+    } catch (err) {
+      console.error("Error deleting category:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete category",
+      });
     }
   };
 
@@ -317,14 +354,22 @@ export default function CategoryDetailPage({
             {/* Action Buttons */}
             <div className="flex items-center space-x-3 ml-6">
               <button
-                onClick={() => handleEdit(category)}
+                onClick={() => {
+                  console.log("Edit button clicked for category:", category);
+                  navigate("/categories/update", {
+                    state: { editCategory: category },
+                  });
+                }}
                 className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
               >
                 <Edit className="w-4 h-4" />
                 <span>Edit</span>
               </button>
               <button
-                onClick={() => handleDelete(category.id)}
+                onClick={() => {
+                  console.log("Delete button clicked for category:", category);
+                  handleDelete(category.id);
+                }}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
               >
                 <Trash2 className="w-4 h-4" />
