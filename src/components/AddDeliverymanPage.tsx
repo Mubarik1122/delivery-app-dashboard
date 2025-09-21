@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Swal from "sweetalert2";
 import {
   User,
   Mail,
@@ -12,6 +11,9 @@ import {
   Building,
   FileText,
   Lock,
+  Eye,
+  EyeOff,
+  Upload,
 } from "lucide-react";
 import { apiService, CreateUserRequest } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +22,9 @@ export default function AddDeliverymanPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -31,13 +36,22 @@ export default function AddDeliverymanPage() {
     state: "",
     zip_code: "",
     description: "",
-    agreement_docs: "",
+    agreement_docs: null as File | null,
     password: "",
     confirmPassword: "",
   });
 
   const handleBack = () => {
     navigate("/delivery-man-list");
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        agreement_docs: e.target.files![0],
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,7 +72,7 @@ export default function AddDeliverymanPage() {
 
     try {
       const requestData: CreateUserRequest = {
-        role_name: "Rider", // Always set to driver
+        role_name: "Rider",
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
         phone_number: formData.phone_number.trim(),
@@ -68,43 +82,30 @@ export default function AddDeliverymanPage() {
         city: formData.city.trim(),
         state: formData.state.trim(),
         zip_code: formData.zip_code.trim(),
-        description: formData.description.trim() || "Delivery driver",
+        description: formData.description.trim() || "Delivery Rider",
         restaurant_name: null,
-        agreement_docs: formData.agreement_docs.trim() || undefined,
+        agreement_docs: formData.agreement_docs
+          ? formData.agreement_docs.name
+          : undefined, // store filename or handle file upload API
         password: formData.password,
       };
 
-      console.log("Creating delivery driver with data:", requestData);
+      console.log("Creating delivery rider with data:", requestData);
 
       const response = await apiService.createUser(requestData);
 
       if (response && response.errorCode === 0) {
-        // Success - navigate back to list
         navigate("/delivery-man-list");
-        Swal.fire({
-          icon: "success",
-          title: "Success!",
-          text: "Delivery driver created successfully",
-          timer: 2000,
-          showConfirmButton: false,
-        });
       } else {
-        Swal.fire({
-          icon: "error",
-          title: "Error",
-          text: response?.errorMessage || "Failed to create delivery driver",
-        });
+        setError(response?.errorMessage || "Failed to create delivery rider");
       }
     } catch (error) {
-      console.error("Error creating delivery driver:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text:
-          error instanceof Error
-            ? error.message
-            : "Failed to create delivery driver",
-      });
+      console.error("Error creating delivery rider:", error);
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Failed to create delivery rider"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -112,7 +113,6 @@ export default function AddDeliverymanPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (error) setError("");
   };
 
@@ -355,20 +355,34 @@ export default function AddDeliverymanPage() {
             </h3>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agreement Documents
+                Agreement Document (PDF/Image)
               </label>
-              <div className="relative">
-                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 mb-2">
+                  {formData.agreement_docs
+                    ? formData.agreement_docs.name
+                    : "Click to upload agreement document"}
+                </p>
                 <input
-                  type="text"
-                  value={formData.agreement_docs}
-                  onChange={(e) =>
-                    handleInputChange("agreement_docs", e.target.value)
-                  }
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="Document reference or filename (optional)"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="agreement-upload"
                   disabled={isSubmitting}
                 />
+                <button
+                  type="button"
+                  onClick={() =>
+                    document.getElementById("agreement-upload")?.click()
+                  }
+                  disabled={isSubmitting}
+                  className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Choose File</span>
+                </button>
               </div>
             </div>
           </div>
@@ -379,6 +393,7 @@ export default function AddDeliverymanPage() {
               Account Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Password *
@@ -386,20 +401,32 @@ export default function AddDeliverymanPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={formData.password}
                     onChange={(e) =>
                       handleInputChange("password", e.target.value)
                     }
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Enter password (min 8 characters)"
                     required
                     minLength={8}
                     disabled={isSubmitting}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
+              {/* Confirm Password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirm Password *
@@ -407,16 +434,27 @@ export default function AddDeliverymanPage() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     value={formData.confirmPassword}
                     onChange={(e) =>
                       handleInputChange("confirmPassword", e.target.value)
                     }
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Confirm password"
                     required
                     disabled={isSubmitting}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
