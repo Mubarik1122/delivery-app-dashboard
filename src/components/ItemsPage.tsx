@@ -703,7 +703,7 @@ export default function ItemsPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center space-x-2">
                                   <span className="text-sm font-medium text-gray-800 truncate">
-                                    {category.isSubCategory ? "↳ " : ""}
+                                    {category.isSubCategory ? "" : ""}
                                     {category.categoryName}
                                   </span>
                                   <span

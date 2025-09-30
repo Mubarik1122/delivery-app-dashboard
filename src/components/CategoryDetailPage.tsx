@@ -301,7 +301,7 @@ export default function CategoryDetailPage({
           <img
             src={category.coverImage}
             alt={category.categoryName}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             onError={(e) => {
               e.currentTarget.style.display = "none";
               e.currentTarget.nextElementSibling?.classList.remove("hidden");
@@ -379,7 +379,7 @@ export default function CategoryDetailPage({
           </div>
 
           {/* Category Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <Calendar className="w-5 h-5 text-gray-500" />
@@ -402,13 +402,13 @@ export default function CategoryDetailPage({
               </span>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-4">
+            {/* <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <Package className="w-5 h-5 text-gray-500" />
                 <span className="font-medium text-gray-700">Products</span>
               </div>
               <span className="text-gray-600">{products.length} items</span>
-            </div>
+            </div> */}
           </div>
 
           {/* Parent Categories (for sub-categories) */}
@@ -524,84 +524,82 @@ export default function CategoryDetailPage({
       </div>
 
       {/* Show related subcategories for subcategories */}
-      {category.isSubCategory && parentCategories.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
-              <FolderOpen className="w-6 h-6 text-gray-600" />
-              <span>Other Sub Categories in Same Parent</span>
-            </h2>
-            {(() => {
-              // Get all subcategories that share the same parent(s) but exclude current category
-              const relatedSubCategories = allCategories.filter(
-                (cat) =>
-                  cat.isSubCategory &&
-                  cat.id !== category.id &&
-                  cat.parentCategoryIds?.some((parentId) =>
-                    category.parentCategoryIds?.includes(parentId)
-                  )
-              );
+      {category.isSubCategory &&
+        parentCategories.length > 0 &&
+        (() => {
+          // Get all subcategories that share the same parent(s) but exclude current category
+          const relatedSubCategories = allCategories.filter(
+            (cat) =>
+              cat.isSubCategory &&
+              cat.id !== category.id &&
+              cat.parentCategoryIds?.some((parentId) =>
+                category.parentCategoryIds?.includes(parentId)
+              )
+          );
 
-              return (
-                <>
-                  <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                    {relatedSubCategories.length} items
-                  </span>
+          return (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+                  <FolderOpen className="w-6 h-6 text-gray-600" />
+                  <span>Other Sub Categories in Same Parent</span>
+                </h2>
+                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                  {relatedSubCategories.length} items
+                </span>
+              </div>
 
-                  <div className="w-full mt-6">
-                    {relatedSubCategories.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {relatedSubCategories.map((relatedSubCategory) => (
-                          <div
-                            key={relatedSubCategory.id}
-                            onClick={() =>
-                              handleViewSubCategory(relatedSubCategory)
-                            }
-                            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                          >
-                            <div className="flex items-center space-x-3 mb-3">
-                              <img
-                                src={relatedSubCategory.coverImage}
-                                alt={relatedSubCategory.categoryName}
-                                className="w-12 h-12 rounded-lg object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = DEFAULT_IMAGE;
-                                }}
-                              />
-                              <div>
-                                <h4 className="font-medium text-gray-800">
-                                  {relatedSubCategory.categoryName}
-                                </h4>
-                                <p className="text-sm text-gray-600">
-                                  {relatedSubCategory.shortDescription}
-                                </p>
-                              </div>
-                            </div>
-                            <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                              Related Sub Category
-                            </span>
-                          </div>
-                        ))}
+              {relatedSubCategories.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {relatedSubCategories.map((relatedSubCategory) => (
+                    <div
+                      key={relatedSubCategory.id}
+                      onClick={() => handleViewSubCategory(relatedSubCategory)}
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-3 mb-3">
+                        <img
+                          src={relatedSubCategory.coverImage}
+                          alt={relatedSubCategory.categoryName}
+                          className="w-12 h-12 rounded-lg object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_IMAGE;
+                          }}
+                        />
+                        <div>
+                          <h4 className="font-medium text-gray-800">
+                            {relatedSubCategory.categoryName}
+                          </h4>
+                          <p className="text-sm text-gray-600">
+                            {relatedSubCategory.shortDescription}
+                          </p>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <p className="text-gray-600">
-                          No related sub-categories found
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Other sub-categories with the same parent will appear
-                          here
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                          Related Sub Category
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          Click to view details
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">
+                    No related sub-categories found
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Other sub-categories with the same parent will appear here
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {/* Products Section */}
       {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
