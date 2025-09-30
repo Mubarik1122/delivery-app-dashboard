@@ -1257,7 +1257,7 @@ export default function ItemsPage() {
                               {item.itemName}
                             </div>
                             <div className="text-sm text-gray-500">
-                              ID: #{item.id}
+                              {item.shortDescription}
                             </div>
                           </div>
                         </div>
