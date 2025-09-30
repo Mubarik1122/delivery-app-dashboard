@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import {
   Search,
   Plus,
-  Edit,
+  CreditCard as Edit,
   Trash2,
   Eye,
   FolderOpen,
@@ -19,7 +19,7 @@ import {
   RefreshCw,
   Image as ImageIcon,
   Package,
-  Grid,
+  Grid2x2 as Grid,
   List,
   Upload,
   Link,
@@ -653,8 +653,9 @@ export default function CategoriesPage() {
               <button
                 type="button"
                 onClick={() => {
-                  navigate("/categories");
+                  setShowAddForm(false);
                   resetForm();
+                  navigate("/categories", { replace: true });
                 }}
                 className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
               >
@@ -956,6 +957,7 @@ export default function CategoriesPage() {
                 onClick={() => {
                   setShowAddForm(false);
                   resetForm();
+                  navigate("/categories", { replace: true });
                 }}
                 className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 disabled={isSubmitting}

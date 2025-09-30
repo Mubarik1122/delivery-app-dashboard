@@ -227,11 +227,11 @@ export default function ItemDetailPage() {
           </button>
 
           {/* Item ID Badge */}
-          <div className="absolute top-4 right-4">
+          {/* <div className="absolute top-4 right-4">
             <span className="bg-white bg-opacity-90 text-gray-800 px-3 py-1 rounded-full text-sm font-medium">
               Item #{item.id}
             </span>
-          </div>
+          </div> */}
         </div>
 
         {/* Item Info */}
@@ -253,7 +253,7 @@ export default function ItemDetailPage() {
                 <p className="text-lg text-gray-600 mb-4">
                   {item.shortDescription}
                 </p>
-                <div className="flex items-center space-x-4 mb-4">
+                {/* <div className="flex items-center space-x-4 mb-4">
                   <div className="flex items-center space-x-1">
                     <Star className="w-5 h-5 text-yellow-400 fill-current" />
                     <span className="text-lg font-medium text-gray-700">
@@ -261,7 +261,7 @@ export default function ItemDetailPage() {
                     </span>
                     <span className="text-gray-500">(128 reviews)</span>
                   </div>
-                </div>
+                </div> */}
                 <div className="flex flex-wrap gap-2">
                   {itemCategories.map((category) => (
                     <span
@@ -402,7 +402,7 @@ export default function ItemDetailPage() {
       </div>
 
       {/* Additional Info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h3 className="text-xl font-semibold text-gray-800 mb-6">
           Additional Information
         </h3>
@@ -435,7 +435,7 @@ export default function ItemDetailPage() {
             <span className="text-gray-600">2-3 people</span>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
