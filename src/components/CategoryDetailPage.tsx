@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   ArrowLeft,
-  Edit,
+  CreditCard as Edit,
   Trash2,
   Package,
   FolderOpen,
@@ -11,7 +11,7 @@ import {
   Calendar,
   Tag,
 } from "lucide-react";
-import { Category, apiService } from "../services/api";
+import { Category, Item, apiService } from "../services/api";
 
 // Mock products data - replace with actual API call
 const mockProducts = [
@@ -63,6 +63,7 @@ export default function CategoryDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [products, setProducts] = useState(mockProducts);
   const [subCategories, setSubCategories] = useState<Category[]>([]);
+  const [relatedItems, setRelatedItems] = useState<Item[]>([]);
 
   // Default demo image
   const DEFAULT_IMAGE =
@@ -109,8 +110,8 @@ export default function CategoryDetailPage({
             }
             return [];
           })(),
-          createdAt: cat.created_at || cat.createdAt,
-          updatedAt: cat.updated_at || cat.updatedAt,
+          createdAt: cat.creation_timestamp || cat.created_at || cat.createdAt,
+          updatedAt: cat.updation_timestamp || cat.updated_at || cat.updatedAt,
         }));
 
         console.log("Mapped categories:", mapped);
@@ -155,6 +156,9 @@ export default function CategoryDetailPage({
 
           // Set mock products
           setProducts(mockProducts);
+
+          // Fetch related items
+          fetchRelatedItems(foundCategory.id);
         } else {
           setError("Category not found");
         }
@@ -260,6 +264,49 @@ export default function CategoryDetailPage({
 
   const handleViewParentCategory = (parentCategory: Category) => {
     navigate(`/categories/${parentCategory.id}`);
+  };
+
+  const fetchRelatedItems = async (categoryId: number) => {
+    try {
+      const response = await apiService.getAllItems();
+      if (response.errorCode === 0 && response.data && response.data.items) {
+        const DEFAULT_COVER_IMAGE =
+          "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
+        const DEFAULT_BACKGROUND_IMAGE =
+          "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=800";
+
+        const mappedItems = response.data.items
+          .map((item: any) => ({
+            id: Number(item.id),
+            itemName: item.item_name || item.itemName,
+            shortDescription:
+              item.short_description || item.shortDescription || "",
+            longDescription:
+              item.long_description || item.longDescription || "",
+            coverImageUrl:
+              item.cover_image_url || item.coverImageUrl || DEFAULT_COVER_IMAGE,
+            backgroundImageUrl:
+              item.background_image_url ||
+              item.backgroundImageUrl ||
+              DEFAULT_BACKGROUND_IMAGE,
+            categoryIds: Array.isArray(item.categories)
+              ? item.categories.map((cat: any) => cat.id)
+              : [],
+            createdAt: item.created_at || item.createdAt,
+            updatedAt: item.updated_at || item.updatedAt,
+            vendorId: item.vendor_id || item.vendorId,
+          }))
+          .filter((item: Item) => item.categoryIds.includes(categoryId));
+
+        setRelatedItems(mappedItems);
+      }
+    } catch (err) {
+      console.error("Error fetching related items:", err);
+    }
+  };
+
+  const handleViewItem = (itemId: number) => {
+    navigate(`/items/${itemId}`);
   };
 
   if (loading) {
@@ -379,7 +426,7 @@ export default function CategoryDetailPage({
           </div>
 
           {/* Category Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <Calendar className="w-5 h-5 text-gray-500" />
@@ -387,7 +434,11 @@ export default function CategoryDetailPage({
               </div>
               <span className="text-gray-600">
                 {category.createdAt
-                  ? new Date(category.createdAt).toLocaleDateString()
+                  ? new Date(category.createdAt).toLocaleDateString("en-US", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })
                   : "N/A"}
               </span>
             </div>
@@ -402,13 +453,13 @@ export default function CategoryDetailPage({
               </span>
             </div>
 
-            {/* <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <Package className="w-5 h-5 text-gray-500" />
-                <span className="font-medium text-gray-700">Products</span>
+                <span className="font-medium text-gray-700">Related Items</span>
               </div>
-              <span className="text-gray-600">{products.length} items</span>
-            </div> */}
+              <span className="text-gray-600">{relatedItems.length} items</span>
+            </div>
           </div>
 
           {/* Parent Categories (for sub-categories) */}
@@ -600,6 +651,66 @@ export default function CategoryDetailPage({
             </div>
           );
         })()}
+
+      {/* Related Items Section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
+            <Package className="w-6 h-6 text-gray-600" />
+            <span>Related Items</span>
+          </h2>
+          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+            {relatedItems.length} items
+          </span>
+        </div>
+
+        {relatedItems.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {relatedItems.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => handleViewItem(item.id)}
+                className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+              >
+                <img
+                  src={item.coverImageUrl}
+                  alt={item.itemName}
+                  className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_IMAGE;
+                  }}
+                />
+                <div className="p-4">
+                  <h4 className="font-medium text-gray-800 mb-2 line-clamp-2">
+                    {item.itemName}
+                  </h4>
+                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                    {item.shortDescription}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleDateString()
+                        : ""}
+                    </span>
+                    <span className="text-xs text-blue-600 font-medium">
+                      View Details
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-600">No items found in this category</p>
+            <p className="text-sm text-gray-500">
+              Items assigned to this category will appear here
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Products Section */}
       {/* <div className="bg-white rounded-xl border border-gray-200 p-6">

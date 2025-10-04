@@ -58,6 +58,13 @@ export default function CategoriesPage() {
     isSubCategory: false,
     coverImage: "",
   });
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const handleParentCategoryToggle = (categoryId: number) => {
+    const newIds = formData.parentCategoryIds.includes(categoryId)
+      ? formData.parentCategoryIds.filter((id) => id !== categoryId)
+      : [...formData.parentCategoryIds, categoryId];
+    handleInputChange("parentCategoryIds", newIds);
+  };
 
   // Check if we're in add or edit mode based on URL
   const isAddMode = location.pathname === "/categories/new";
@@ -112,6 +119,8 @@ export default function CategoriesPage() {
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
+          createdAt: cat.created_at || cat.createdAt,
+          updatedAt: cat.updated_at || cat.updatedAt,
         }));
         setCategories(mapped);
       } else {
@@ -786,34 +795,108 @@ export default function CategoriesPage() {
                 {formData.isSubCategory && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Parent Category *
+                      Select Parent Categories *
                     </label>
-                    <select
-                      value={formData.parentCategoryIds[0] || ""}
-                      onChange={(e) => {
-                        const selectedId = e.target.value
-                          ? [parseInt(e.target.value)]
-                          : [];
-                        handleInputChange("parentCategoryIds", selectedId);
-                      }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                      required
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Select a parent category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.isSubCategory ? "" : ""}
-                          {category.categoryName}
-                        </option>
-                      ))}
-                    </select>
-                    {formData.isSubCategory &&
-                      formData.parentCategoryIds.length === 0 && (
-                        <p className="text-sm text-red-500 mt-1">
-                          Please select a parent category
-                        </p>
+                    <div className="relative">
+                      {/* Trigger */}
+                      <div
+                        onClick={() =>
+                          setShowCategoryDropdown(!showCategoryDropdown)
+                        }
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer bg-white min-h-[48px] flex items-center justify-between"
+                      >
+                        <div className="flex-1">
+                          {formData.parentCategoryIds.length === 0 ? (
+                            <span className="text-gray-500">
+                              Select parent categories...
+                            </span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {formData.parentCategoryIds
+                                .slice(0, 3)
+                                .map((id) => {
+                                  const category = categories.find(
+                                    (cat) => cat.id === id
+                                  );
+                                  return category ? (
+                                    <span
+                                      key={id}
+                                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
+                                    >
+                                      <img
+                                        src={category.coverImage}
+                                        alt={category.categoryName}
+                                        className="w-4 h-4 rounded-full object-cover"
+                                      />
+                                      {category.categoryName}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleInputChange(
+                                            "parentCategoryIds",
+                                            formData.parentCategoryIds.filter(
+                                              (cid) => cid !== id
+                                            )
+                                          );
+                                        }}
+                                        className="ml-1 hover:bg-blue-200 rounded-full p-0.5"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </span>
+                                  ) : null;
+                                })}
+                              {formData.parentCategoryIds.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                                  +{formData.parentCategoryIds.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Dropdown menu */}
+                      {showCategoryDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                          <div className="p-2 space-y-1">
+                            {categories
+                              .filter((cat) => !cat.isSubCategory) // only parent categories
+                              .map((category) => (
+                                <label
+                                  key={category.id}
+                                  className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.parentCategoryIds.includes(
+                                      category.id
+                                    )}
+                                    onChange={() =>
+                                      handleParentCategoryToggle(category.id)
+                                    }
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                  />
+                                  <img
+                                    src={category.coverImage}
+                                    alt={category.categoryName}
+                                    className="w-8 h-8 rounded-lg object-cover border border-gray-200"
+                                  />
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {category.categoryName}
+                                  </span>
+                                </label>
+                              ))}
+                          </div>
+                        </div>
                       )}
+                    </div>
+                    {formData.parentCategoryIds.length === 0 && (
+                      <p className="text-sm text-red-500 mt-1">
+                        Please select at least one parent category
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

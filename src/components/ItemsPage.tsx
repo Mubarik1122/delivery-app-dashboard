@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import {
   Search,
   Plus,
-  Edit,
+  CreditCard as Edit,
   Trash2,
   Eye,
   Save,
@@ -43,7 +43,6 @@ export default function ItemsPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [imageUploadMethod, setImageUploadMethod] = useState<"url" | "upload">(
     "url"
   );
@@ -171,6 +170,8 @@ export default function ItemsPage() {
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
+          createdAt: cat.created_at || cat.createdAt,
+          updatedAt: cat.updated_at || cat.updatedAt,
         }));
         setCategories(mapped);
       }
@@ -310,7 +311,7 @@ export default function ItemsPage() {
   };
 
   const handleViewItem = (item: Item) => {
-    setSelectedItem(item);
+    navigate(`/items/${item.id}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -434,10 +435,6 @@ export default function ItemsPage() {
       .filter((cat) => categoryIds.includes(cat.id))
       .map((cat) => cat.categoryName)
       .join(", ");
-  };
-
-  const closeModal = () => {
-    setSelectedItem(null);
   };
 
   if (showAddForm) {
@@ -1475,99 +1472,6 @@ export default function ItemsPage() {
           </div>
         )}
       </div>
-
-      {/* Item Detail Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="relative">
-              <img
-                src={selectedItem.backgroundImageUrl}
-                alt={selectedItem.itemName}
-                className="w-full h-64 object-cover rounded-t-2xl"
-                onError={(e) => {
-                  e.currentTarget.src = DEFAULT_BACKGROUND_IMAGE;
-                }}
-              />
-              <button
-                onClick={closeModal}
-                className="absolute top-4 right-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6">
-              <div className="flex items-start space-x-6 mb-6">
-                <img
-                  src={selectedItem.coverImageUrl}
-                  alt={selectedItem.itemName}
-                  className="w-32 h-32 object-cover rounded-xl border border-gray-200"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_COVER_IMAGE;
-                  }}
-                />
-                <div className="flex-1">
-                  <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                    {selectedItem.itemName}
-                  </h2>
-                  <p className="text-lg text-gray-600 mb-4">
-                    {selectedItem.shortDescription}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedItem.categoryIds.map((categoryId) => {
-                      const category = categories.find(
-                        (cat) => cat.id === categoryId
-                      );
-                      return category ? (
-                        <span
-                          key={categoryId}
-                          className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                        >
-                          {category.categoryName}
-                        </span>
-                      ) : null;
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              {selectedItem.longDescription && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Description
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">
-                    {selectedItem.longDescription}
-                  </p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => {
-                    closeModal();
-                    handleEditItem(selectedItem);
-                  }}
-                  className="flex-1 bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium"
-                >
-                  Edit Item
-                </button>
-                <button
-                  onClick={closeModal}
-                  className="px-6 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
