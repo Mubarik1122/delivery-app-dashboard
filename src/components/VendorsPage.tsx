@@ -5,7 +5,7 @@ import {
   Search,
   Plus,
   Eye,
-  Edit,
+  CreditCard as Edit,
   Trash2,
   Building,
   User,
@@ -14,6 +14,7 @@ import {
   MapPin,
   Loader,
   RefreshCw,
+  Download,
 } from "lucide-react";
 import { apiService, User as ApiUser } from "../services/api";
 
@@ -139,8 +140,61 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
   const handleRefresh = () => {
     loadVendors();
   };
+
   const closeModal = () => {
     setSelectedVendor(null);
+  };
+
+  const handleExport = () => {
+    const csvHeaders = [
+      "Name",
+      "Email",
+      "Phone",
+      "Restaurant",
+      "Address",
+      "Join Date",
+      "Status",
+      "Total Orders",
+      "Revenue",
+    ];
+
+    const csvRows = filteredVendors.map((vendor) => [
+      vendor.name,
+      vendor.email,
+      vendor.phone,
+      vendor.restaurantName,
+      vendor.address.replace(/,/g, ";"),
+      vendor.joinDate,
+      vendor.status,
+      vendor.totalOrders,
+      vendor.revenue.toFixed(2),
+    ]);
+
+    const csvContent = [
+      csvHeaders.join(","),
+      ...csvRows.map((row) => row.join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `vendors-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    Swal.fire({
+      icon: "success",
+      title: "Exported!",
+      text: "Vendors list has been exported successfully.",
+      timer: 2000,
+      showConfirmButton: false,
+    });
   };
 
   return (
@@ -231,17 +285,26 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
           </div> */}
         </div>
 
-        {/* Search */}
+        {/* Search and Export */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Search vendors by name, email, or restaurant..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search vendors by name, email, or restaurant..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+            <button
+              onClick={handleExport}
+              className="bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2 whitespace-nowrap"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export</span>
+            </button>
           </div>
         </div>
 
@@ -357,17 +420,25 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="flex items-center space-x-2">
                             <button
-                              onClick={() => handleViewVendor(vendor)}
+                              onClick={() => navigate(`/vendors/${vendor.id}`)}
                               className="text-blue-600 hover:text-blue-800"
+                              title="View Details"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button className="text-green-600 hover:text-green-800">
+                            <button
+                              onClick={() =>
+                                navigate(`/vendors/edit/${vendor.id}`)
+                              }
+                              className="text-green-600 hover:text-green-800"
+                              title="Edit"
+                            >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleDeleteVendor(vendor.id)}
                               className="text-red-600 hover:text-red-800"
+                              title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

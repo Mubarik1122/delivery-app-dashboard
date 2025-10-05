@@ -19,6 +19,8 @@ import FoodPage from "./components/FoodPage";
 import CustomerPage from "./components/CustomerPage";
 import DeliverymanListPage from "./components/DeliverymanListPage";
 import AddDeliverymanPage from "./components/AddDeliverymanPage";
+import DeliverymanDetailPage from "./components/DeliverymanDetailPage";
+import EditDeliverymanPage from "./components/EditDeliverymanPage";
 import JoiningRequestPage from "./components/JoiningRequestPage";
 import DeliverymanReviewsPage from "./components/DeliverymanReviewsPage";
 import GenericPage from "./components/GenericPage";
@@ -31,6 +33,8 @@ import RecentOrders from "./components/RecentOrders";
 import VendorDashboard from "./components/VendorDashboard";
 import VendorsPage from "./components/VendorsPage";
 import AddVendorPage from "./components/AddVendorPage";
+import VendorDetailPage from "./components/VendorDetailPage";
+import EditVendorPage from "./components/EditVendorPage";
 import CategoriesPage from "./components/CategoriesPage";
 import CategoryDetailPage from "./components/CategoryDetailPage";
 import ItemsPage from "./components/ItemsPage";
@@ -246,6 +250,14 @@ function App() {
               element={<DeliverymanListPage />}
             />
             <Route
+              path="/delivery-man-list/:id"
+              element={<DeliverymanDetailPage />}
+            />
+            <Route
+              path="/delivery-man-list/edit/:id"
+              element={<EditDeliverymanPage />}
+            />
+            <Route
               path="/add-new-delivery-man"
               element={<AddDeliverymanPage />}
             />
@@ -263,6 +275,8 @@ function App() {
                 <VendorsPage onAddVendor={() => navigate("/vendors/new")} />
               }
             />
+            <Route path="/vendors/:id" element={<VendorDetailPage />} />
+            <Route path="/vendors/edit/:id" element={<EditVendorPage />} />
             <Route
               path="/vendors/new"
               element={<AddVendorPage onBack={() => navigate("/vendors")} />}
