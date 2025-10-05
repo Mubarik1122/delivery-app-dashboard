@@ -599,13 +599,13 @@ export default function CategoriesPage() {
         categoryToDelete.isSubCategory &&
         categoryToDelete.parentCategoryIds?.length > 0
       ) {
-        // For subcategories: use subcategoryId and parentCategoryId
+        // For subcategories with parent: detach from parent using categoryId and parentCategoryId
         deletePayload = {
-          subcategoryId: categoryId,
+          categoryId: categoryId,
           parentCategoryId: categoryToDelete.parentCategoryIds[0],
         };
       } else {
-        // For parent categories: use only categoryId
+        // For parent categories or orphan categories: soft delete using only categoryId
         deletePayload = {
           categoryId: categoryId,
         };
