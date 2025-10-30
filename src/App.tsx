@@ -15,7 +15,6 @@ import OTPVerificationPage from "./components/OTPVerificationPage";
 import ProfilePage from "./components/ProfilePage";
 import OrdersPage from "./components/OrdersPage";
 import POSPage from "./components/POSPage";
-import FoodPage from "./components/FoodPage";
 import CustomerPage from "./components/CustomerPage";
 import DeliverymanListPage from "./components/DeliverymanListPage";
 import AddDeliverymanPage from "./components/AddDeliverymanPage";
@@ -226,7 +225,6 @@ function App() {
               }
             />
             <Route path="/pos" element={<POSPage />} />
-            <Route path="/food" element={<FoodPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/items" element={<ItemsPage />} />
             <Route path="/items/new" element={<ItemsPage />} />

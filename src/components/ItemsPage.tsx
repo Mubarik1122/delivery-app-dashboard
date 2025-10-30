@@ -63,6 +63,8 @@ export default function ItemsPage() {
     coverImageUrl: "",
     backgroundImageUrl: "",
     categoryIds: [] as number[],
+    quantity: 0,
+    price: 0,
   });
 
   // DataTable specific states
@@ -88,6 +90,8 @@ export default function ItemsPage() {
         coverImageUrl: item.coverImageUrl,
         backgroundImageUrl: item.backgroundImageUrl,
         categoryIds: item.categoryIds,
+        quantity: item.quantity || 0,
+        price: item.price || 0,
       });
       setCoverImagePreview(item.coverImageUrl);
       setBackgroundImagePreview(item.backgroundImageUrl);
@@ -137,6 +141,8 @@ export default function ItemsPage() {
           categoryIds: Array.isArray(item.categories)
             ? item.categories.map((cat: any) => cat.id)
             : [],
+          quantity: item.quantity || 0,
+          price: item.price || 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
@@ -253,6 +259,8 @@ export default function ItemsPage() {
       coverImageUrl: "",
       backgroundImageUrl: "",
       categoryIds: [],
+      quantity: 0,
+      price: 0,
     });
     setEditingItem(null);
     setSelectedCoverFile(null);
@@ -339,6 +347,8 @@ export default function ItemsPage() {
         coverImageUrl: finalCoverImage,
         backgroundImageUrl: finalBackgroundImage,
         categoryIds: formData.categoryIds,
+        quantity: formData.quantity,
+        price: formData.price,
       };
 
       let response;
@@ -529,6 +539,43 @@ export default function ItemsPage() {
                     rows={4}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Enter detailed description of the item"
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Price ($) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price}
+                    onChange={(e) =>
+                      handleInputChange("price", parseFloat(e.target.value) || 0)
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Enter item price"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Quantity in Stock *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.quantity}
+                    onChange={(e) =>
+                      handleInputChange("quantity", parseInt(e.target.value) || 0)
+                    }
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    placeholder="Enter quantity in stock"
+                    required
                     disabled={isSubmitting}
                   />
                 </div>
@@ -1215,6 +1262,12 @@ export default function ItemsPage() {
                       </button>
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Price
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stock
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Categories
                     </th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1263,6 +1316,20 @@ export default function ItemsPage() {
                         <div className="text-sm text-gray-900 max-w-xs truncate">
                           {item.shortDescription || "No description"}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-semibold text-green-600">
+                          ${(item.price || 0).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          (item.quantity || 0) > 0
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {item.quantity || 0} {(item.quantity || 0) === 1 ? "unit" : "units"}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">

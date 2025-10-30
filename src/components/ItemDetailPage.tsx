@@ -88,6 +88,8 @@ export default function ItemDetailPage() {
             : Array.isArray(item.categoryIds)
             ? item.categoryIds
             : [],
+          quantity: item.quantity || 0,
+          price: item.price || 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
@@ -297,7 +299,27 @@ export default function ItemDetailPage() {
       </div>
 
       {/* Item Details */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center space-x-2 mb-2">
+            <span className="text-3xl">💵</span>
+            <span className="font-medium text-gray-700">Price</span>
+          </div>
+          <span className="text-2xl font-bold text-green-600">
+            ${(item.price || 0).toFixed(2)}
+          </span>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center space-x-2 mb-2">
+            <Package className="w-5 h-5 text-gray-500" />
+            <span className="font-medium text-gray-700">Stock</span>
+          </div>
+          <span className="text-2xl font-bold text-blue-600">
+            {item.quantity || 0}
+          </span>
+        </div>
+
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center space-x-2 mb-2">
             <Calendar className="w-5 h-5 text-gray-500" />
@@ -322,10 +344,16 @@ export default function ItemDetailPage() {
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center space-x-2 mb-2">
-            <Package className="w-5 h-5 text-gray-500" />
+            <span className="text-xl">📊</span>
             <span className="font-medium text-gray-700">Status</span>
           </div>
-          <span className="text-gray-600">Active</span>
+          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+            (item.quantity || 0) > 0
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}>
+            {(item.quantity || 0) > 0 ? "In Stock" : "Out of Stock"}
+          </span>
         </div>
       </div>
 

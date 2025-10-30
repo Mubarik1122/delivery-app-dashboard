@@ -151,7 +151,6 @@ export default function Sidebar({
     ];
 
     const commonItems: MenuItem[] = [
-      { id: "food", label: "Food", icon: Utensils },
       { id: "coupon", label: "Coupon", icon: Gift },
     ];
 
