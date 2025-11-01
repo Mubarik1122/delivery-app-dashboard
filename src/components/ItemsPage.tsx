@@ -142,7 +142,13 @@ export default function ItemsPage() {
             ? item.categories.map((cat: any) => cat.id)
             : [],
           quantity: Number(item.quantity) || 0,
-          price: parseFloat(item.price) || 0,
+          // <-- updated price mapping: prefer unit_price, then price
+          price:
+            item.unit_price !== undefined && item.unit_price !== null
+              ? parseFloat(String(item.unit_price)) || 0
+              : item.price !== undefined && item.price !== null
+              ? parseFloat(String(item.price)) || 0
+              : 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
@@ -269,6 +275,7 @@ export default function ItemsPage() {
     setBackgroundImagePreview("");
     setImageUploadMethod("url");
     setBackgroundImageMethod("url");
+    setShowAddForm(false);
   };
 
   const handleFileSelect = (
@@ -396,7 +403,10 @@ export default function ItemsPage() {
     }
   };
 
-  const handleInputChange = (field: string, value: string | number[]) => {
+  const handleInputChange = (
+    field: string,
+    value: string | number | number[]
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -553,7 +563,10 @@ export default function ItemsPage() {
                     min="0"
                     value={formData.price}
                     onChange={(e) =>
-                      handleInputChange("price", parseFloat(e.target.value) || 0)
+                      handleInputChange(
+                        "price",
+                        parseFloat(e.target.value) || 0
+                      )
                     }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Enter item price"
@@ -571,7 +584,10 @@ export default function ItemsPage() {
                     min="0"
                     value={formData.quantity}
                     onChange={(e) =>
-                      handleInputChange("quantity", parseInt(e.target.value) || 0)
+                      handleInputChange(
+                        "quantity",
+                        parseInt(e.target.value) || 0
+                      )
                     }
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                     placeholder="Enter quantity in stock"
@@ -1323,12 +1339,15 @@ export default function ItemsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          (item.quantity || 0) > 0
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}>
-                          {item.quantity || 0} {(item.quantity || 0) === 1 ? "unit" : "units"}
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            (item.quantity || 0) > 0
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {item.quantity || 0}{" "}
+                          {(item.quantity || 0) === 1 ? "unit" : "units"}
                         </span>
                       </td>
                       <td className="px-6 py-4">

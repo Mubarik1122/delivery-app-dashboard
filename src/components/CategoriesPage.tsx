@@ -524,7 +524,8 @@ export default function CategoriesPage() {
 
       if (response && response.errorCode === 0) {
         await loadCategories();
-        setShowAddForm(false);
+        navigate("/categories");
+        resetForm();
         Swal.fire({
           icon: "success",
           title: "Success!",
@@ -534,7 +535,6 @@ export default function CategoriesPage() {
           timer: 2000,
           showConfirmButton: false,
         });
-        resetForm();
       } else {
         Swal.fire({
           icon: "error",

@@ -89,7 +89,13 @@ export default function ItemDetailPage() {
             ? item.categoryIds
             : [],
           quantity: Number(item.quantity) || 0,
-          price: parseFloat(String(item.price)) || 0,
+          // Prefer unit_price from API, then fallback to price
+          price:
+            item.unit_price !== undefined && item.unit_price !== null
+              ? parseFloat(String(item.unit_price)) || 0
+              : item.price !== undefined && item.price !== null
+              ? parseFloat(String(item.price)) || 0
+              : 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
