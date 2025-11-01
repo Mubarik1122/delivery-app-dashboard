@@ -88,8 +88,8 @@ export default function ItemDetailPage() {
             : Array.isArray(item.categoryIds)
             ? item.categoryIds
             : [],
-          quantity: item.quantity || 0,
-          price: item.price || 0,
+          quantity: Number(item.quantity) || 0,
+          price: parseFloat(String(item.price)) || 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
@@ -347,11 +347,13 @@ export default function ItemDetailPage() {
             <span className="text-xl">📊</span>
             <span className="font-medium text-gray-700">Status</span>
           </div>
-          <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-            (item.quantity || 0) > 0
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }`}>
+          <span
+            className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+              (item.quantity || 0) > 0
+                ? "bg-green-100 text-green-800"
+                : "bg-red-100 text-red-800"
+            }`}
+          >
             {(item.quantity || 0) > 0 ? "In Stock" : "Out of Stock"}
           </span>
         </div>

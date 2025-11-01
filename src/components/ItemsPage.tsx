@@ -90,8 +90,8 @@ export default function ItemsPage() {
         coverImageUrl: item.coverImageUrl,
         backgroundImageUrl: item.backgroundImageUrl,
         categoryIds: item.categoryIds,
-        quantity: item.quantity || 0,
-        price: item.price || 0,
+        quantity: Number(item.quantity) || 0,
+        price: parseFloat(String(item.price)) || 0,
       });
       setCoverImagePreview(item.coverImageUrl);
       setBackgroundImagePreview(item.backgroundImageUrl);
@@ -141,8 +141,8 @@ export default function ItemsPage() {
           categoryIds: Array.isArray(item.categories)
             ? item.categories.map((cat: any) => cat.id)
             : [],
-          quantity: item.quantity || 0,
-          price: item.price || 0,
+          quantity: Number(item.quantity) || 0,
+          price: parseFloat(item.price) || 0,
           createdAt: item.created_at || item.createdAt,
           updatedAt: item.updated_at || item.updatedAt,
           vendorId: item.vendor_id || item.vendorId,
@@ -347,8 +347,8 @@ export default function ItemsPage() {
         coverImageUrl: finalCoverImage,
         backgroundImageUrl: finalBackgroundImage,
         categoryIds: formData.categoryIds,
-        quantity: formData.quantity,
-        price: formData.price,
+        quantity: Number(formData.quantity),
+        price: parseFloat(String(formData.price)),
       };
 
       let response;
