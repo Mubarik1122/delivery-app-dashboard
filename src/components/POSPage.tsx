@@ -235,15 +235,37 @@ export default function POSPage() {
     }
     setShowCheckoutModal(true);
   };
+  // Add this temporary function for development
+  const mockPaymentProcessing = async () => {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          id: `pm_mock_${Date.now()}`,
+          success: true,
+        });
+      }, 2000);
+    });
+  };
 
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
 
     try {
-      const paymentMethod = await apiService.createStripePaymentMethod(
-        "tok_visa"
-      );
+      // Mock payment processing with 2 second delay
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // For testing: 90% success rate, 10% failure rate
+      const isSuccess = Math.random() > 0.1;
+
+      if (!isSuccess) {
+        throw new Error("Mock payment declined");
+      }
+
+      const mockPaymentMethod = {
+        id: `pm_mock_${Date.now()}`,
+        success: true,
+      };
 
       const orderData = {
         shipping_address: {
@@ -252,7 +274,7 @@ export default function POSPage() {
           state: checkoutForm.state,
           zip: checkoutForm.zip,
         },
-        payment_method_id: paymentMethod.id,
+        payment_method_id: mockPaymentMethod.id,
         order_total: grandTotal.toString(),
         items: cart.map((item) => ({
           item_id: item.id,
@@ -260,45 +282,114 @@ export default function POSPage() {
         })),
       };
 
-      const response = await apiService.createOrder(orderData);
+      // Clear cart from backend (mock)
+      await apiService.clearCart();
 
-      if (response.errorCode === 0) {
-        await apiService.clearCart();
-        setCart([]);
-        setCartCount(0);
-        setShowCheckoutModal(false);
-        setCheckoutForm({
-          cardholderName: "",
-          cardNumber: "",
-          expiryDate: "",
-          cvv: "",
-          address: "",
-          city: "",
-          state: "",
-          zip: "",
-        });
+      // Clear local cart state
+      setCart([]);
+      setCartCount(0);
 
-        Swal.fire({
-          icon: "success",
-          title: "Order Placed!",
-          text: `Your order has been placed successfully. Total: $${grandTotal.toFixed(
-            2
-          )}`,
-          confirmButtonText: "OK",
-        });
-      }
-    } catch (error) {
+      // Close checkout modal
+      setShowCheckoutModal(false);
+
+      // Reset checkout form
+      setCheckoutForm({
+        cardholderName: "",
+        cardNumber: "",
+        expiryDate: "",
+        cvv: "",
+        address: "",
+        city: "",
+        state: "",
+        zip: "",
+      });
+
+      // Show success message
+      Swal.fire({
+        icon: "success",
+        title: "Payment Successful!",
+        text: `Your order has been placed. Total: $${grandTotal.toFixed(2)}`,
+        confirmButtonText: "OK",
+        timer: 3000,
+      });
+    } catch (error: any) {
       console.error("Checkout error:", error);
+
       Swal.fire({
         icon: "error",
-        title: "Checkout Failed",
+        title: "Payment Failed",
         text:
-          error instanceof Error ? error.message : "Failed to process payment",
+          error.message ||
+          "There was an issue processing your payment. Please try again.",
       });
     } finally {
       setIsProcessing(false);
     }
   };
+
+  // const handleCheckoutSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setIsProcessing(true);
+
+  //   try {
+  //     const paymentMethod = await apiService.createStripePaymentMethod(
+  //       "tok_visa"
+  //     );
+
+  //     const orderData = {
+  //       shipping_address: {
+  //         line1: checkoutForm.address,
+  //         city: checkoutForm.city,
+  //         state: checkoutForm.state,
+  //         zip: checkoutForm.zip,
+  //       },
+  //       payment_method_id: paymentMethod.id,
+  //       order_total: grandTotal.toString(),
+  //       items: cart.map((item) => ({
+  //         item_id: item.id,
+  //         quantity: item.quantity,
+  //       })),
+  //     };
+
+  //     const response = await apiService.createOrder(orderData);
+
+  //     if (response.errorCode === 0) {
+  //       await apiService.clearCart();
+  //       setCart([]);
+  //       setCartCount(0);
+  //       setShowCheckoutModal(false);
+  //       setCheckoutForm({
+  //         cardholderName: "",
+  //         cardNumber: "",
+  //         expiryDate: "",
+  //         cvv: "",
+  //         address: "",
+  //         city: "",
+  //         state: "",
+  //         zip: "",
+  //       });
+
+  //       Swal.fire({
+  //         icon: "success",
+  //         title: "Order Placed!",
+  //         text: `Your order has been placed successfully. Total: $${grandTotal.toFixed(
+  //           2
+  //         )}`,
+  //         confirmButtonText: "OK",
+  //       });
+  //     }
+  //   } catch (error) {
+  //     console.error("Checkout error:", error);
+  //     Swal.fire({
+  //       icon: "error",
+  //       title: "Checkout Failed",
+  //       text:
+  //         error instanceof Error ? error.message : "Failed to process payment",
+  //     });
+  //   } finally {
+  //     setIsProcessing(false);
+  //   }
+  // };
 
   const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const tax = total * 0.1;
