@@ -14,6 +14,7 @@ import ForgotPasswordPage from "./components/ForgotPasswordPage";
 import OTPVerificationPage from "./components/OTPVerificationPage";
 import ProfilePage from "./components/ProfilePage";
 import OrdersPage from "./components/OrdersPage";
+import OrderDetailPage from "./components/OrderDetailPage";
 import POSPage from "./components/POSPage";
 import CustomerPage from "./components/CustomerPage";
 import DeliverymanListPage from "./components/DeliverymanListPage";
@@ -299,6 +300,11 @@ function App() {
                 />
               }
             />
+            <Route
+              path="/all-orders"
+              element={<OrdersPage orderType="all-orders" />}
+            />
+            <Route path="/order/:id" element={<OrderDetailPage />} />
             <Route
               path="/*-orders"
               element={<OrdersPage orderType={location.pathname.slice(1)} />}

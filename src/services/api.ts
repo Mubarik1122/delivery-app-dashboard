@@ -254,7 +254,41 @@ export interface StripePaymentMethodResponse {
   object: string;
   type: string;
 }
+// Add these interfaces to your api.ts file
+export interface Order {
+  id: string;
+  order_id: string;
+  status: string;
+  order_status: string;
+  order_total: string;
+  created_at: string;
+  updated_at: string;
+  shipping_address: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    zip: string;
+  };
+  items: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
+  user_id?: number;
+  vendor_id?: number;
+}
 
+export interface OrdersResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: {
+    orders: Order[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  } | null;
+}
 class ApiService {
   private async makeRequest<T>(
   endpoint: string,
@@ -364,7 +398,6 @@ class ApiService {
   }
 
   async createUpdateCategory(data: CreateUpdateCategoryRequest): Promise<CategoryResponse> {
-    console.log('Creating/Updating category with data:', data);
     return this.makeRequest<CategoryResponse>('/category/createUpdateCategory', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -372,7 +405,6 @@ class ApiService {
   }
 
   async updateCategory(data: UpdateCategoryRequest): Promise<CategoryResponse> {
-    console.log('Updating category with data:', data);
     return this.makeRequest<CategoryResponse>('/category/createUpdateCategory', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -436,7 +468,6 @@ class ApiService {
   }
 
   async createUpdateItem(data: CreateUpdateItemRequest): Promise<ItemResponse> {
-    // console.log('Creating/Updating item with data:', data);
     return this.makeRequest<ItemResponse>('/item/createUpdateItem', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -444,7 +475,6 @@ class ApiService {
   }
 
   async updateItem(data: UpdateItemRequest): Promise<ItemResponse> {
-    // console.log('Updating item with data:', data);
     return this.makeRequest<ItemResponse>('/item/createUpdateItem', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -599,7 +629,58 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
-
+// Add this to your ApiService class in api.ts
+async getAllOrders(params?: {
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+  order_status?: string;
+}): Promise<any> {
+  try {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.order_status) queryParams.append('order_status', params.order_status);
+    
+    const queryString = queryParams.toString();
+    const url = `/order${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await this.makeRequest<any>(url, {
+      method: 'GET',
+    });
+    
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+// Add method to get vendor-specific orders
+async getVendorOrders(vendorId: number, params?: {
+  start_date?: string;
+  end_date?: string;
+  page?: number;
+  limit?: number;
+  order_status?: string;
+}): Promise<OrdersResponse> {
+  const queryParams = new URLSearchParams();
+  
+  if (params?.start_date) queryParams.append('start_date', params.start_date);
+  if (params?.end_date) queryParams.append('end_date', params.end_date);
+  if (params?.page) queryParams.append('page', params.page.toString());
+  if (params?.limit) queryParams.append('limit', params.limit.toString());
+  if (params?.order_status) queryParams.append('order_status', params.order_status);
+  
+  const queryString = queryParams.toString();
+  const url = `/order/vendor/${vendorId}${queryString ? `?${queryString}` : ''}`;
+  
+  return this.makeRequest<OrdersResponse>(url, {
+    method: 'GET',
+  });
+}
   // Stripe Payment Method Creation
   async createStripePaymentMethod(cardToken: string): Promise<StripePaymentMethodResponse> {
     // const stripeSecretKey = ;
