@@ -70,7 +70,7 @@ export default function AddDeliverymanPage() {
         password: formData.password,
       };
 
-      console.log("Creating delivery man with data:", requestData);
+      // console.log("Creating delivery man with data:", requestData);
 
       const response = await apiService.createUser(requestData);
 

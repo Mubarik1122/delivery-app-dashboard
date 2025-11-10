@@ -70,7 +70,7 @@ export default function OrdersPage({ orderType }: OrdersPageProps) {
         limit: 100,
       });
 
-      console.log("📋 Orders API response:", ordersResponse);
+      // console.log("📋 Orders API response:", ordersResponse);
 
       let apiOrders: any[] = [];
 
@@ -87,7 +87,7 @@ export default function OrdersPage({ orderType }: OrdersPageProps) {
         apiOrders = ordersResponse.data.orders;
       }
 
-      console.log("🔄 Processed orders:", apiOrders);
+      // console.log("🔄 Processed orders:", apiOrders);
 
       // Transform API data to match our Order interface
       const transformedOrders: Order[] = apiOrders.map(
@@ -128,7 +128,7 @@ export default function OrdersPage({ orderType }: OrdersPageProps) {
       );
 
       setOrders(transformedOrders);
-      console.log("✅ Orders loaded successfully:", transformedOrders.length);
+      // console.log("✅ Orders loaded successfully:", transformedOrders.length);
     } catch (err: any) {
       console.error("❌ Error fetching orders:", err);
       setError(

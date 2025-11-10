@@ -88,7 +88,7 @@ export default function VendorDashboard() {
 
       setVendorId(currentVendorId);
 
-      console.log("🛍️ Fetching dashboard data for vendor:", currentVendorId);
+      //console.log("🛍️ Fetching dashboard data for vendor:", currentVendorId);
 
       // Fetch vendor-specific data
       const [itemsResponse, ordersResponse] = await Promise.all([
@@ -101,8 +101,8 @@ export default function VendorDashboard() {
         }),
       ]);
 
-      console.log("📦 Items response:", itemsResponse);
-      console.log("📋 Orders response:", ordersResponse);
+      ////console.log("📦 Items response:", itemsResponse);
+      ////console.log("📋 Orders response:", ordersResponse);
 
       // Process items data - get only items belonging to this vendor
       const allItems = itemsResponse.data?.items || [];
@@ -127,8 +127,8 @@ export default function VendorDashboard() {
         orders = ordersResponse.data.orders;
       }
 
-      console.log("🔄 Processed orders for stats:", orders);
-      console.log("📊 Number of orders found:", orders.length);
+      ////console.log("🔄 Processed orders for stats:", orders);
+      ////console.log("📊 Number of orders found:", orders.length);
 
       const totalOrders = orders.length;
 
@@ -149,7 +149,7 @@ export default function VendorDashboard() {
         return total + orderTotal;
       }, 0);
 
-      console.log("💰 Revenue calculated:", revenue);
+      ////console.log("💰 Revenue calculated:", revenue);
 
       // Calculate growth based on order count
       const growth = calculateGrowth(orders);
@@ -188,7 +188,7 @@ export default function VendorDashboard() {
           };
         });
 
-      console.log("📊 Recent orders data:", recentOrdersData);
+      //console.log("📊 Recent orders data:", recentOrdersData);
 
       // Generate real chart data from orders
       const dailySales = generateRealSalesData(orders);
@@ -209,15 +209,15 @@ export default function VendorDashboard() {
       setSalesData(dailySales);
       setRevenueData(weeklyRevenue);
 
-      console.log("✅ Dashboard data loaded successfully");
-      console.log("📊 Final Stats:", {
-        totalProducts,
-        totalOrders,
-        revenue,
-        pendingOrders,
-        completedOrders,
-        totalCustomers,
-      });
+      //console.log("✅ Dashboard data loaded successfully");
+      // console.log("📊 Final Stats:", {
+      //   totalProducts,
+      //   totalOrders,
+      //   revenue,
+      //   pendingOrders,
+      //   completedOrders,
+      //   totalCustomers,
+      // });
     } catch (err: any) {
       console.error("❌ Error fetching dashboard data:", err);
       setError(

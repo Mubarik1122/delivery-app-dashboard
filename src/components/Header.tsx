@@ -8,14 +8,27 @@ import {
   LogOut,
   UserCircle,
 } from "lucide-react";
+// ...existing code...
 
 interface HeaderProps {
   onProfileAction: (action: "profile" | "logout" | "login") => void;
   userRole: "admin" | "vendor";
+  userName?: string; // added prop for user name
 }
 
-export default function Header({ onProfileAction, userRole }: HeaderProps) {
+// ...existing code...
+export default function Header({
+  onProfileAction,
+  userRole,
+  userName,
+}: HeaderProps) {
   const [showProfileDropdown, setShowProfileDropdown] = React.useState(false);
+
+  // choose avatar gradient based on role
+  const avatarGradient =
+    userRole === "admin"
+      ? "from-red-500 to-red-600"
+      : "from-blue-500 to-blue-600";
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 sticky top-0 z-30">
@@ -56,15 +69,19 @@ export default function Header({ onProfileAction, userRole }: HeaderProps) {
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
               className="flex items-center space-x-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center shadow-sm">
+              <div
+                className={`w-8 h-8 bg-gradient-to-br ${avatarGradient} rounded-full flex items-center justify-center shadow-sm`}
+              >
                 <User className="w-4 h-4 text-white" />
               </div>
               <div className="hidden lg:block">
                 <div>
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 capitalize">
-                    {userRole}
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
+                    {userName ?? userRole}
                   </span>
-                  <div className="text-xs text-gray-500">{userRole}</div>
+                  <div className="text-xs text-gray-500 capitalize">
+                    {userRole}
+                  </div>
                 </div>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-600 group-hover:text-gray-800 hidden lg:block" />
@@ -101,3 +118,4 @@ export default function Header({ onProfileAction, userRole }: HeaderProps) {
     </header>
   );
 }
+// ...existing code...

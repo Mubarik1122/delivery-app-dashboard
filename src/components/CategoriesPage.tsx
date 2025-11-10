@@ -105,7 +105,7 @@ export default function CategoriesPage() {
       setError("");
       const response = await apiService.getAllCategories();
 
-      console.log("Categories API Response:", response);
+      // console.log("Categories API Response:", response);
 
       if (response.errorCode === 0 && response.data) {
         // Map snake_case to camelCase and ensure parentCategoryIds is always an array
@@ -611,7 +611,7 @@ export default function CategoriesPage() {
         };
       }
 
-      console.log("Deleting category with payload:", deletePayload);
+      // console.log("Deleting category with payload:", deletePayload);
 
       const response = await apiService.deleteCategory(deletePayload);
 

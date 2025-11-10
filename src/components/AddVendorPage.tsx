@@ -78,7 +78,7 @@ export default function AddVendorPage({ onBack }: AddVendorPageProps) {
         password: formData.password,
       };
 
-      console.log("Creating vendor with data:", requestData);
+      // console.log("Creating vendor with data:", requestData);
 
       const response = await apiService.createVendor(requestData);
 

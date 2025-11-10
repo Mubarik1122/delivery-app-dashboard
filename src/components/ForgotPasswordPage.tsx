@@ -33,7 +33,7 @@ export default function ForgotPasswordPage({
       if (response.errorCode === 0) {
         setIsOtpSent(true);
         setOtpDigits(Array(6).fill(""));
-        console.log("OTP:", response.data?.otp); // 🔒 Remove in production
+        // console.log("OTP:", response.data?.otp); // 🔒 Remove in production
       } else {
         Swal.fire({
           icon: "error",

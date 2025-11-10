@@ -64,10 +64,10 @@ export default function ItemDetailPage() {
       setLoading(true);
       setError(null);
 
-      console.log("Fetching item details for ID:", itemId);
+      // console.log("Fetching item details for ID:", itemId);
 
       const response = await apiService.getAllItems();
-      console.log("Items API Response:", response);
+      // console.log("Items API Response:", response);
 
       if (response.errorCode === 0 && response.data) {
         // Map the API response to ensure consistent structure
@@ -101,23 +101,23 @@ export default function ItemDetailPage() {
           vendorId: item.vendor_id || item.vendorId,
         }));
 
-        console.log("Mapped items:", mappedItems);
-        console.log("Looking for item with ID:", Number(itemId));
+        // console.log("Mapped items:", mappedItems);
+        // console.log("Looking for item with ID:", Number(itemId));
 
         const foundItem = mappedItems.find((i) => i.id === Number(itemId));
-        console.log("Found item:", foundItem);
+        // console.log("Found item:", foundItem);
 
         if (foundItem) {
           setItem(foundItem);
         } else {
-          console.log("Item not found in mapped items");
+          // console.log("Item not found in mapped items");
           setError(`Item with ID ${itemId} not found`);
         }
       } else {
         setError(response.errorMessage || "Failed to load item");
       }
     } catch (err) {
-      console.error("Error fetching item details:", err);
+      // console.error("Error fetching item details:", err);
       setError("Failed to load item details");
     } finally {
       setLoading(false);

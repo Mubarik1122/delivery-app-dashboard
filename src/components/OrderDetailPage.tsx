@@ -80,7 +80,7 @@ export default function OrderDetailPage() {
         limit: 100,
       });
 
-      console.log("📋 Orders response for detail:", ordersResponse);
+      // console.log("📋 Orders response for detail:", ordersResponse);
 
       let apiOrders: any[] = [];
 
@@ -122,7 +122,7 @@ export default function OrderDetailPage() {
       };
 
       setOrder(orderDetail);
-      console.log("✅ Order detail loaded:", orderDetail);
+      // console.log("✅ Order detail loaded:", orderDetail);
     } catch (err: any) {
       console.error("❌ Error fetching order detail:", err);
       setError(err.message || "Failed to load order details");

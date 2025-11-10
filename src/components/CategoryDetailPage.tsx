@@ -80,10 +80,10 @@ export default function CategoryDetailPage({
       setLoading(true);
       setError(null);
 
-      console.log("Fetching category details for ID:", categoryId);
+      //console.log("Fetching category details for ID:", categoryId);
 
       const response = await apiService.getAllCategories();
-      console.log("API Response:", response);
+      //console.log("API Response:", response);
 
       if (response.errorCode === 0 && response.data) {
         // Map snake_case to camelCase and ensure parentCategoryIds is always an array
@@ -114,7 +114,7 @@ export default function CategoryDetailPage({
           updatedAt: cat.updation_timestamp || cat.updated_at || cat.updatedAt,
         }));
 
-        console.log("Mapped categories:", mapped);
+        //console.log("Mapped categories:", mapped);
         setAllCategories(mapped);
 
         // Find the current category
@@ -122,7 +122,7 @@ export default function CategoryDetailPage({
           (cat) => cat.id.toString() === categoryId
         );
 
-        console.log("Found category:", foundCategory);
+        //console.log("Found category:", foundCategory);
 
         if (foundCategory) {
           setCategory(foundCategory);
@@ -132,14 +132,14 @@ export default function CategoryDetailPage({
             foundCategory.isSubCategory &&
             foundCategory.parentCategoryIds?.length > 0
           ) {
-            console.log(
-              "Finding parents for IDs:",
-              foundCategory.parentCategoryIds
-            );
+            // //console.log(
+            //   "Finding parents for IDs:",
+            //   foundCategory.parentCategoryIds
+            // );
             const parents = mapped.filter((cat) =>
               foundCategory.parentCategoryIds?.includes(cat.id)
             );
-            console.log("Found parents:", parents);
+            //console.log("Found parents:", parents);
             setParentCategories(parents);
           } else {
             setParentCategories([]);
@@ -151,7 +151,7 @@ export default function CategoryDetailPage({
               cat.isSubCategory &&
               cat.parentCategoryIds?.includes(foundCategory.id)
           );
-          console.log("Found subcategories:", subCats);
+          //console.log("Found subcategories:", subCats);
           setSubCategories(subCats);
 
           // Set mock products
@@ -228,7 +228,7 @@ export default function CategoryDetailPage({
         };
       }
 
-      console.log("Deleting category with payload:", deletePayload);
+      //console.log("Deleting category with payload:", deletePayload);
 
       const response = await apiService.deleteCategory(deletePayload);
 
@@ -402,7 +402,7 @@ export default function CategoryDetailPage({
             <div className="flex items-center space-x-3 ml-6">
               <button
                 onClick={() => {
-                  console.log("Edit button clicked for category:", category);
+                  //console.log("Edit button clicked for category:", category);
                   navigate("/categories/update", {
                     state: { editCategory: category },
                   });
@@ -414,7 +414,7 @@ export default function CategoryDetailPage({
               </button>
               <button
                 onClick={() => {
-                  console.log("Delete button clicked for category:", category);
+                  //console.log("Delete button clicked for category:", category);
                   handleDelete(category.id);
                 }}
                 className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
