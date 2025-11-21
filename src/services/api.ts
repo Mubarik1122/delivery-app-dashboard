@@ -253,8 +253,7 @@ export interface AddToCartRequest {
 export interface UpdateCartRequest {
   quantity: number;
 }
-
-// Order Interfaces
+ 
 export interface Order {
   id: string;
   order_id: string;
