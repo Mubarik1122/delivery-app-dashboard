@@ -1,5 +1,4 @@
-const API_BASE_URL = 'https://groceryapp-production-d3fc.up.railway.app/api';
-
+const BASE_URL = (import.meta.env.VITE_API_URL as string) ;
 // Auth Interfaces
 export interface LoginRequest {
   identifier: string;
@@ -350,12 +349,10 @@ export class ApiError extends Error {
 }
 
 class ApiService {
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {},
-    timeout = 15000
-  ): Promise<T> {
-    const url = `${API_BASE_URL}${endpoint}`;
+   private base = BASE_URL;
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}, timeout = 15000): Promise<T> {
+    const url = endpoint.startsWith('http') ? endpoint : `${this.base}${endpoint}`;
+   
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
