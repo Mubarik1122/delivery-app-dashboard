@@ -405,8 +405,9 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                   <Edit className="w-4 h-4" />
                   <span>Edit Profile</span>
                 </button>
+                {/* Changed: navigate to confirmation page instead of deleting directly */}
                 <button
-                  onClick={handleDeleteProfile}
+                  onClick={() => navigate("/delete-confirmation")}
                   disabled={isDeleting}
                   className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >

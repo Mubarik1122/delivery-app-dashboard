@@ -50,6 +50,8 @@ import {
   Gift,
   Bell,
 } from "lucide-react";
+import DeleteConfirmationPage from "./components/DeleteConfirmationPage";
+import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
 
 function App() {
   const navigate = useNavigate();
@@ -192,6 +194,8 @@ function App() {
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route
               path="/dashboard"
               element={
@@ -260,6 +264,10 @@ function App() {
             <Route
               path="/profile"
               element={<ProfilePage onBack={() => navigate(-1)} />}
+            />
+            <Route
+              path="/delete-confirmation"
+              element={<DeleteConfirmationPage />}
             />
             <Route
               path="/coupon"
