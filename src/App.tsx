@@ -59,7 +59,6 @@ function App() {
     "login" | "signup" | "forgot-password" | "otp-verification"
   >("login");
   const [otpEmail, setOtpEmail] = useState("");
-  const [showProfile, setShowProfile] = useState(false);
 
   // Persist userRole in localStorage
   const [userRole, setUserRole] = useState<"admin" | "vendor">(
@@ -93,7 +92,6 @@ function App() {
       setUserRole(userRole as "admin" | "vendor");
       localStorage.setItem("user_role", userRole);
     } else {
-      // Handle unexpected roles - default to vendor but could show error
       console.warn(`Unexpected user role: ${user.role}, defaulting to vendor`);
       setUserRole("vendor");
       localStorage.setItem("user_role", "vendor");
@@ -111,7 +109,6 @@ function App() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_role");
     setIsAuthenticated(false);
-    setShowProfile(false);
     setUserRole("admin");
     setAuthMode("login");
     navigate("/dashboard");
@@ -120,7 +117,7 @@ function App() {
   const handleProfileAction = (action: "profile" | "logout" | "login") => {
     switch (action) {
       case "profile":
-        setShowProfile(true);
+        navigate("/profile");
         break;
       case "logout":
         handleLogout();
@@ -182,27 +179,7 @@ function App() {
     }
   }
 
-  // Show profile page if requested
-  if (showProfile) {
-    return (
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar
-          activeSection={location.pathname.slice(1) || "dashboard"}
-          onSectionChange={(section) => navigate(`/${section}`)}
-          userRole={userRole}
-        />
-        <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-          <Header onProfileAction={handleProfileAction} userRole={userRole} />
-          <main className="flex-1 overflow-auto p-4 lg:p-6">
-            <ProfilePage onBack={() => setShowProfile(false)} />
-          </main>
-        </div>
-      </div>
-    );
-  }
-
   // Main authenticated app with routing
-
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar
@@ -279,6 +256,10 @@ function App() {
             <Route
               path="/vendors/new"
               element={<AddVendorPage onBack={() => navigate("/vendors")} />}
+            />
+            <Route
+              path="/profile"
+              element={<ProfilePage onBack={() => navigate(-1)} />}
             />
             <Route
               path="/coupon"

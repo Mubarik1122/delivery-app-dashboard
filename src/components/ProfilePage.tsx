@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 import {
   User,
   Mail,
@@ -14,10 +16,13 @@ import {
   Store,
   Building,
   AlertCircle,
+  Trash2,
+  ArrowLeft,
 } from "lucide-react";
+import { apiService } from "../services/api";
 
 interface ProfilePageProps {
-  onBack: () => void;
+  onBack?: () => void;
 }
 
 interface ProfileData {
@@ -38,9 +43,11 @@ interface ProfileData {
 }
 
 export default function ProfilePage({ onBack }: ProfilePageProps) {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
@@ -51,7 +58,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
       // Try localStorage first
       const storedUser = localStorage.getItem("user_data");
       if (storedUser) {
-        // console.log("Found user data in localStorage:", JSON.parse(storedUser));
         return JSON.parse(storedUser);
       }
 
@@ -61,7 +67,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
         try {
           // Decode token to get basic user info
           const tokenData = JSON.parse(atob(token.split(".")[1]));
-          // console.log("Token data:", tokenData);
 
           // Create basic user data from token
           const basicUserData = {
@@ -101,15 +106,10 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
       const storedUser = getStoredUserData();
 
       if (!storedUser) {
-        // Check if user is actually logged in (has token)
         const token = localStorage.getItem("auth_token");
         if (!token) {
           throw new Error("No user data found. Please log in again.");
         } else {
-          // User has token but no stored data - create basic profile
-          // console.log(
-          //   "User has token but no stored data, creating basic profile..."
-          // );
           const basicProfile: ProfileData = {
             id: 1,
             firstName: "User",
@@ -155,7 +155,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
           storedUser.restaurant_name || storedUser.restaurantName || "",
       };
 
-      // console.log("Setting profile data:", userData);
       setProfileData(userData);
     } catch (err: any) {
       console.error("Error in fetchUserProfile:", err);
@@ -192,7 +191,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
       };
 
       // For demo purposes - simulate API call
-      // console.log("Updating profile:", updateData);
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Update stored user data
@@ -200,7 +198,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
       const updatedUser = {
         ...currentStoredUser,
         ...updateData,
-        // Ensure we have all required fields
         id: currentStoredUser?.id || profileData.id,
         role: currentStoredUser?.role || profileData.role,
         email: updateData.email_address,
@@ -218,6 +215,77 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     }
   };
 
+  const handleDeleteProfile = async () => {
+    if (!profileData) return;
+
+    const result = await Swal.fire({
+      title: "Delete Profile?",
+      text: "Are you sure you want to delete your account? This action cannot be undone!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete my account",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    // Second confirmation for extra safety
+    const finalConfirm = await Swal.fire({
+      title: "Final Confirmation",
+      text: "This will permanently delete your account and all associated data. Are you absolutely sure?",
+      icon: "error",
+      input: "text",
+      inputPlaceholder: 'Type "DELETE" to confirm',
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Delete Account",
+      preConfirm: (value) => {
+        if (value !== "DELETE") {
+          Swal.showValidationMessage('Please type "DELETE" to confirm');
+        }
+        return value;
+      },
+    });
+
+    if (!finalConfirm.isConfirmed) return;
+
+    try {
+      setIsDeleting(true);
+
+      // Call API to delete user
+      await apiService.deleteUser(profileData.id);
+
+      // Show success message
+      await Swal.fire({
+        icon: "success",
+        title: "Account Deleted",
+        text: "Your account has been permanently deleted.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      // Clear all local storage and redirect to login
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user_role");
+      localStorage.removeItem("user_data");
+
+      // Redirect to home/login page
+      window.location.href = "/";
+    } catch (err: any) {
+      console.error("Error deleting profile:", err);
+      Swal.fire({
+        icon: "error",
+        title: "Deletion Failed",
+        text: err.message || "Failed to delete account. Please try again.",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleInputChange = (field: keyof ProfileData, value: string) => {
     if (profileData) {
       setProfileData((prev) => (prev ? { ...prev, [field]: value } : null));
@@ -229,6 +297,14 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     setError(null);
     setSuccess(null);
     fetchUserProfile();
+  };
+
+  const handleBackClick = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate(-1);
+    }
   };
 
   const getFullAddress = () => {
@@ -261,29 +337,12 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
     return roleMap[role.toLowerCase()] || role;
   };
 
-  // Debug function to check what's in localStorage
-  const debugStorage = () => {
-    // console.log("Auth token:", localStorage.getItem("auth_token"));
-    // console.log("User data:", localStorage.getItem("user_data"));
-  };
-
-  // Call this on component mount to debug
-  useEffect(() => {
-    debugStorage();
-  }, []);
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading profile...</p>
-          <button
-            onClick={debugStorage}
-            className="mt-2 text-sm text-blue-500 hover:text-blue-700"
-          >
-            Debug Storage
-          </button>
         </div>
       </div>
     );
@@ -301,16 +360,10 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
             <p className="mb-4">{error || "Unable to load profile data."}</p>
             <div className="space-y-2">
               <button
-                onClick={onBack}
+                onClick={handleBackClick}
                 className="w-full bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
               >
                 Go Back
-              </button>
-              <button
-                onClick={debugStorage}
-                className="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Debug Storage
               </button>
               <button
                 onClick={fetchUserProfile}
@@ -332,24 +385,37 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={onBack}
-              className="text-gray-600 hover:text-gray-800 transition-colors"
+              onClick={handleBackClick}
+              className="text-gray-600 hover:text-gray-800 transition-colors flex items-center space-x-2"
             >
-              <X className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back</span>
             </button>
             <h1 className="text-2xl font-bold text-gray-800">
               Profile Settings
             </h1>
           </div>
-          {!isEditing && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <Edit className="w-4 h-4" />
-              <span>Edit Profile</span>
-            </button>
-          )}
+          <div className="flex items-center space-x-3">
+            {!isEditing && (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  <span>Edit Profile</span>
+                </button>
+                <button
+                  onClick={handleDeleteProfile}
+                  disabled={isDeleting}
+                  className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isDeleting ? "Deleting..." : "Delete Profile"}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -365,7 +431,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
         </div>
       )}
 
-      {/* Rest of your profile page UI remains the same */}
+      {/* Profile Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Picture Section */}
         <div className="lg:col-span-1">
@@ -423,6 +489,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
             </div>
           </div>
         </div>
+
         {/* Profile Information */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -648,24 +715,6 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
           </div>
         </div>
       </div>
-
-      {/* Security Settings */}
-      {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center space-x-2">
-          <Shield className="w-5 h-5" />
-          <span>Security Settings</span>
-        </h3>
-        <div className="space-y-4">
-          <button className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2">
-            <Lock className="w-4 h-4" />
-            <span>Change Password</span>
-          </button>
-          <button className="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 ml-0 md:ml-4">
-            <Shield className="w-4 h-4" />
-            <span>Enable Two-Factor Authentication</span>
-          </button>
-        </div>
-      </div> */}
     </div>
   );
 }
