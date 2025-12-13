@@ -225,6 +225,7 @@ function App() {
               }
             />
             <Route path="/customer" element={<CustomerPage />} />
+            <Route path="/deliveryman" element={<DeliverymanListPage />} />
             <Route
               path="/delivery-man-list"
               element={<DeliverymanListPage />}
@@ -316,19 +317,266 @@ function App() {
 
 // Dashboard content component
 function DashboardContent() {
-  // Demo data for dashboard
+  const [loading, setLoading] = React.useState(true);
+  const [stats, setStats] = React.useState({
+    pending: 0,
+    confirmed: 0,
+    processing: 0,
+    outForDelivery: 0,
+    delivered: 0,
+    cancelled: 0,
+    returned: 0,
+    failed: 0,
+  });
+  const [orders, setOrders] = React.useState<any[]>([]);
+  const [items, setItems] = React.useState<any[]>([]);
+
+  // Fetch dashboard data
+  React.useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+
+        // Create apiService instance
+        const { apiService } = await import('./services/api');
+
+        // Fetch orders and items
+        const [ordersResponse, itemsResponse] = await Promise.all([
+          apiService.getAllOrders({ page: 1, limit: 1000 }),
+          apiService.getAllItems(),
+        ]);
+
+        // Process orders
+        let allOrders: any[] = [];
+        if (ordersResponse.data?.data?.orders && Array.isArray(ordersResponse.data.data.orders)) {
+          allOrders = ordersResponse.data.data.orders;
+        } else if (ordersResponse.data?.orders && Array.isArray(ordersResponse.data.orders)) {
+          allOrders = ordersResponse.data.orders;
+        }
+
+        // Process items
+        const allItems = itemsResponse.data?.items || [];
+
+        // Calculate stats from orders
+        const newStats = {
+          pending: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'pending').length,
+          confirmed: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'confirmed').length,
+          processing: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'processing').length,
+          outForDelivery: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'out-for-delivery').length,
+          delivered: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'delivered').length,
+          cancelled: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'cancelled').length,
+          returned: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'returned').length,
+          failed: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'failed').length,
+        };
+
+        setStats(newStats);
+        setOrders(allOrders);
+        setItems(allItems);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Helper functions to generate chart data
+  const generateMonthlyOrderData = () => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = new Date().getFullYear();
+    const monthlyCounts: number[] = Array(12).fill(0);
+
+    orders.forEach((order: any) => {
+      try {
+        const orderDate = new Date(order.created_at);
+        if (orderDate.getFullYear() === currentYear) {
+          const month = orderDate.getMonth();
+          monthlyCounts[month]++;
+        }
+      } catch (error) {
+        // Skip invalid dates
+      }
+    });
+
+    return months.map((label, index) => ({
+      label,
+      value: monthlyCounts[index],
+    }));
+  };
+
+  const generateMonthlyEarningsData = () => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const currentYear = new Date().getFullYear();
+    const monthlyEarnings: number[] = Array(12).fill(0);
+
+    orders.forEach((order: any) => {
+      try {
+        const orderDate = new Date(order.created_at);
+        if (orderDate.getFullYear() === currentYear) {
+          const month = orderDate.getMonth();
+          const amount = parseFloat(order.total_amount) || 0;
+          monthlyEarnings[month] += amount;
+        }
+      } catch (error) {
+        // Skip invalid dates
+      }
+    });
+
+    return months.map((label, index) => ({
+      label,
+      value: Math.round(monthlyEarnings[index]),
+    }));
+  };
+
+  const generateTopProducts = () => {
+    // Count order items to find top selling products
+    const productCounts: { [key: string]: { count: number; item: any } } = {};
+
+    orders.forEach((order: any) => {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        order.order_items.forEach((orderItem: any) => {
+          const itemId = orderItem.item_id || orderItem.id;
+          if (itemId) {
+            if (!productCounts[itemId]) {
+              productCounts[itemId] = { count: 0, item: orderItem };
+            }
+            productCounts[itemId].count += orderItem.quantity || 1;
+          }
+        });
+      }
+    });
+
+    // Convert to array and sort by count
+    const topProductsArray = Object.values(productCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((p) => {
+        const item = items.find((i: any) => i.id === p.item.item_id) || p.item;
+        return {
+          name: item.item_name || item.name || "Unknown Product",
+          price: `$${parseFloat(item.price || 0).toFixed(2)}`,
+          rating: 4.5,
+          orders: p.count,
+          image: item.cover_image_url || item.image || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
+        };
+      });
+
+    // Return default if no products
+    if (topProductsArray.length === 0) {
+      return items.slice(0, 4).map((item: any) => ({
+        name: item.item_name || "Product",
+        price: `$${parseFloat(item.price || 0).toFixed(2)}`,
+        rating: 4.5,
+        orders: 0,
+        image: item.cover_image_url || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
+      }));
+    }
+
+    return topProductsArray;
+  };
+
+  const generateTopCustomers = () => {
+    const customerOrders: { [key: string]: { name: string; phone: string; count: number } } = {};
+
+    orders.forEach((order: any) => {
+      const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Unknown';
+      const customerPhone = order.customer_phone || '**********';
+      const key = `${customerName}_${customerPhone}`;
+
+      if (!customerOrders[key]) {
+        customerOrders[key] = {
+          name: customerName,
+          phone: customerPhone,
+          count: 0,
+        };
+      }
+      customerOrders[key].count++;
+    });
+
+    return Object.values(customerOrders)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((c) => ({
+        name: c.name,
+        phone: c.phone,
+        orders: c.count,
+      }));
+  };
+
+  const generateRecentOrders = () => {
+    return orders
+      .sort((a: any, b: any) => {
+        const dateA = new Date(a.created_at);
+        const dateB = new Date(b.created_at);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, 5)
+      .map((order: any) => {
+        const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Customer';
+        const amount = parseFloat(order.total_amount) || 0;
+
+        // Format time ago
+        let timeAgo = 'Recently';
+        try {
+          const orderDate = new Date(order.created_at);
+          const now = new Date();
+          const diffMinutes = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60));
+
+          if (diffMinutes < 1) timeAgo = 'Just now';
+          else if (diffMinutes < 60) timeAgo = `${diffMinutes} mins ago`;
+          else if (diffMinutes < 1440) timeAgo = `${Math.floor(diffMinutes / 60)} hours ago`;
+          else timeAgo = `${Math.floor(diffMinutes / 1440)} days ago`;
+        } catch (e) {}
+
+        const statusMap: { [key: string]: "pending" | "confirmed" | "processing" | "delivered" | "cancelled" } = {
+          'pending': 'pending',
+          'confirmed': 'confirmed',
+          'processing': 'processing',
+          'delivered': 'delivered',
+          'cancelled': 'cancelled',
+        };
+
+        return {
+          id: order.order_number || order.id,
+          customer: customerName,
+          status: statusMap[order.order_status?.toLowerCase()] || 'pending',
+          time: timeAgo,
+          amount: `$${amount.toFixed(2)}`,
+        };
+      });
+  };
+
+  // Generate dynamic data from orders and items
+  const orderChartData = generateMonthlyOrderData();
+  const earningsChartData = generateMonthlyEarningsData();
+  const orderStatusData = [
+    { label: "Pending", value: stats.pending, color: "#f59e0b" },
+    { label: "Confirmed", value: stats.confirmed, color: "#10b981" },
+    { label: "Processing", value: stats.processing, color: "#3b82f6" },
+    { label: "Out for delivery", value: stats.outForDelivery, color: "#8b5cf6" },
+    { label: "Delivered", value: stats.delivered, color: "#22c55e" },
+    { label: "Cancelled", value: stats.cancelled, color: "#ef4444" },
+  ];
+  const topProducts = generateTopProducts();
+  const mostRatedProducts = topProducts; // Using same as top selling for now
+  const topCustomers = generateTopCustomers();
+  const recentOrders = generateRecentOrders();
+
+  // Demo data for dashboard (will be replaced with real data)
   const orderStats = [
-    { title: "Pending", value: 49, icon: Clock, color: "orange" as const },
+    { title: "Pending", value: stats.pending, icon: Clock, color: "orange" as const },
     {
       title: "Confirmed",
-      value: 26,
+      value: stats.confirmed,
       icon: CheckCircle,
       color: "green" as const,
     },
-    { title: "Processing", value: 6, icon: Package, color: "blue" as const },
+    { title: "Processing", value: stats.processing, icon: Package, color: "blue" as const },
     {
       title: "Out for delivery",
-      value: 7,
+      value: stats.outForDelivery,
       icon: Truck,
       color: "purple" as const,
     },
@@ -337,173 +585,28 @@ function DashboardContent() {
   const additionalStats = [
     {
       title: "Delivered",
-      value: 46,
+      value: stats.delivered,
       icon: CheckCircle,
       color: "green" as const,
     },
-    { title: "Cancelled", value: 3, icon: XCircle, color: "red" as const },
-    { title: "Returned", value: 2, icon: RotateCcw, color: "gray" as const },
+    { title: "Cancelled", value: stats.cancelled, icon: XCircle, color: "red" as const },
+    { title: "Returned", value: stats.returned, icon: RotateCcw, color: "gray" as const },
     {
       title: "Failed to Deliver",
-      value: 3,
+      value: stats.failed,
       icon: AlertTriangle,
       color: "red" as const,
     },
   ];
 
-  const orderChartData = [
-    { label: "Jan", value: 30 },
-    { label: "Feb", value: 45 },
-    { label: "Mar", value: 60 },
-    { label: "Apr", value: 35 },
-    { label: "May", value: 50 },
-    { label: "Jun", value: 40 },
-    { label: "Jul", value: 55 },
-    { label: "Aug", value: 70 },
-    { label: "Sep", value: 45 },
-    { label: "Oct", value: 65 },
-    { label: "Nov", value: 80 },
-    { label: "Dec", value: 90 },
-  ];
-
-  const earningsChartData = [
-    { label: "Jan", value: 2000 },
-    { label: "Feb", value: 3500 },
-    { label: "Mar", value: 4200 },
-    { label: "Apr", value: 2800 },
-    { label: "May", value: 3800 },
-    { label: "Jun", value: 3200 },
-    { label: "Jul", value: 4500 },
-    { label: "Aug", value: 5200 },
-    { label: "Sep", value: 3600 },
-    { label: "Oct", value: 4800 },
-    { label: "Nov", value: 5500 },
-    { label: "Dec", value: 6200 },
-  ];
-
-  const orderStatusData = [
-    { label: "Pending", value: 49, color: "#f59e0b" },
-    { label: "Confirmed", value: 26, color: "#10b981" },
-    { label: "Processing", value: 6, color: "#3b82f6" },
-    { label: "Out for delivery", value: 7, color: "#8b5cf6" },
-    { label: "Delivered", value: 46, color: "#22c55e" },
-    { label: "Cancelled", value: 3, color: "#ef4444" },
-  ];
-
-  const topProducts = [
-    {
-      name: "Italian Spicy Pizza",
-      price: "USD 45",
-      rating: 4.5,
-      orders: 120,
-      image:
-        "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Ice Cream",
-      price: "USD 15",
-      rating: 4.2,
-      orders: 85,
-      image:
-        "https://images.pexels.com/photos/1352278/pexels-photo-1352278.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Popcorn Rice Bowl",
-      price: "USD 25",
-      rating: 4.8,
-      orders: 95,
-      image:
-        "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Ginger & Figs",
-      price: "USD 35",
-      rating: 4.3,
-      orders: 78,
-      image:
-        "https://images.pexels.com/photos/1099680/pexels-photo-1099680.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-  ];
-
-  const mostRatedProducts = [
-    {
-      name: "Beef Mince 2",
-      price: "USD 25",
-      rating: 4.9,
-      orders: 150,
-      image:
-        "https://images.pexels.com/photos/361184/asparagus-steak-veal-steak-veal-361184.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Mozzarella Cheese",
-      price: "USD 18",
-      rating: 4.7,
-      orders: 120,
-      image:
-        "https://images.pexels.com/photos/1070850/pexels-photo-1070850.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Chicken Sandwich W",
-      price: "USD 22",
-      rating: 4.6,
-      orders: 98,
-      image:
-        "https://images.pexels.com/photos/1633525/pexels-photo-1633525.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-    {
-      name: "Spicy Burger",
-      price: "USD 28",
-      rating: 4.5,
-      orders: 110,
-      image:
-        "https://images.pexels.com/photos/1556909/pexels-photo-1556909.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
-    },
-  ];
-
-  const topCustomers = [
-    { name: "Amelia", phone: "**********", orders: 45 },
-    { name: "Peter", phone: "**********", orders: 38 },
-    { name: "Will", phone: "**********", orders: 32 },
-    { name: "Sarah", phone: "**********", orders: 28 },
-  ];
-
-  const recentOrders = [
-    {
-      id: "100164",
-      customer: "Processing",
-      status: "processing" as const,
-      time: "2 mins ago",
-      amount: "USD 45",
-    },
-    {
-      id: "100163",
-      customer: "Confirmed",
-      status: "confirmed" as const,
-      time: "5 mins ago",
-      amount: "USD 32",
-    },
-    {
-      id: "100162",
-      customer: "Delivered",
-      status: "delivered" as const,
-      time: "10 mins ago",
-      amount: "USD 78",
-    },
-    {
-      id: "100161",
-      customer: "Cancelled",
-      status: "cancelled" as const,
-      time: "15 mins ago",
-      amount: "USD 25",
-    },
-    {
-      id: "100160",
-      customer: "Pending",
-      status: "pending" as const,
-      time: "20 mins ago",
-      amount: "USD 55",
-    },
-  ];
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-lg text-gray-600">Loading dashboard data...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
