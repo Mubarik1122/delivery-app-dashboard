@@ -10,10 +10,19 @@ import {
   RefreshCw,
   Users,
   Star,
+  Plus,
+  ArrowRight,
+  Store,
+  Activity,
+  Award,
+  Zap,
 } from "lucide-react";
 import StatsCard from "./StatsCard";
 import Chart from "./Chart";
 import RecentOrders from "./RecentOrders";
+import OrderStatusChart from "./OrderStatusChart";
+import ProductCard from "./ProductCard";
+import CustomerCard from "./CustomerCard";
 import { apiService } from "../services/api";
 
 interface VendorStats {
@@ -55,6 +64,11 @@ export default function VendorDashboard() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [salesData, setSalesData] = useState<SalesData[]>([]);
   const [revenueData, setRevenueData] = useState<SalesData[]>([]);
+  const [orderStatusData, setOrderStatusData] = useState<{ label: string; value: number; color: string }[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [mostRatedProducts, setMostRatedProducts] = useState<any[]>([]);
+  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,8 +102,6 @@ export default function VendorDashboard() {
 
       setVendorId(currentVendorId);
 
-      //console.log("🛍️ Fetching dashboard data for vendor:", currentVendorId);
-
       // Fetch vendor-specific data
       const [itemsResponse, ordersResponse] = await Promise.all([
         apiService.getAllItems(),
@@ -97,18 +109,14 @@ export default function VendorDashboard() {
           start_date: getStartOfMonth(),
           end_date: getEndOfMonth(),
           page: 1,
-          limit: 100,
+          limit: 1000,
         }),
       ]);
 
-      ////console.log("📦 Items response:", itemsResponse);
-      ////console.log("📋 Orders response:", ordersResponse);
-
       // Process items data - get only items belonging to this vendor
       const allItems = itemsResponse.data?.items || [];
+      setItems(allItems);
       const vendorItems = allItems.filter((item: any) => {
-        // Since we don't have vendor_id in items, we'll assume all items belong to the current vendor
-        // In a real scenario, you'd filter by vendor_id
         return true; // Show all items for now
       });
       const totalProducts = vendorItems.length;
@@ -127,12 +135,9 @@ export default function VendorDashboard() {
         orders = ordersResponse.data.orders;
       }
 
-      ////console.log("🔄 Processed orders for stats:", orders);
-      ////console.log("📊 Number of orders found:", orders.length);
-
       const totalOrders = orders.length;
 
-      // Count orders by status - using the correct field names from API
+      // Count orders by status
       const pendingOrders = orders.filter(
         (order: any) => order.order_status?.toLowerCase() === "pending"
       ).length;
@@ -143,13 +148,11 @@ export default function VendorDashboard() {
           order.order_status?.toLowerCase() === "completed"
       ).length;
 
-      // Calculate revenue from orders - using correct field names
+      // Calculate revenue from orders
       const revenue = orders.reduce((total: number, order: any) => {
         const orderTotal = parseFloat(order.total_amount) || 0;
         return total + orderTotal;
       }, 0);
-
-      ////console.log("💰 Revenue calculated:", revenue);
 
       // Calculate growth based on order count
       const growth = calculateGrowth(orders);
@@ -188,11 +191,23 @@ export default function VendorDashboard() {
           };
         });
 
-      //console.log("📊 Recent orders data:", recentOrdersData);
-
       // Generate real chart data from orders
       const dailySales = generateRealSalesData(orders);
       const weeklyRevenue = generateRealRevenueData(orders);
+
+      // Calculate order status breakdown
+      const orderStatusBreakdown = [
+        { label: "Pending", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "pending").length, color: "#f59e0b" },
+        { label: "Confirmed", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "confirmed").length, color: "#10b981" },
+        { label: "Processing", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "processing").length, color: "#3b82f6" },
+        { label: "Out for delivery", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "out-for-delivery").length, color: "#8b5cf6" },
+        { label: "Delivered", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "delivered" || o.order_status?.toLowerCase() === "completed").length, color: "#22c55e" },
+        { label: "Cancelled", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "cancelled").length, color: "#ef4444" },
+      ];
+
+      // Generate top products
+      const topProductsData = generateTopProducts(orders, allItems);
+      const topCustomersData = generateTopCustomers(orders);
 
       setVendorStats({
         totalProducts,
@@ -208,16 +223,10 @@ export default function VendorDashboard() {
       setRecentOrders(recentOrdersData);
       setSalesData(dailySales);
       setRevenueData(weeklyRevenue);
-
-      //console.log("✅ Dashboard data loaded successfully");
-      // console.log("📊 Final Stats:", {
-      //   totalProducts,
-      //   totalOrders,
-      //   revenue,
-      //   pendingOrders,
-      //   completedOrders,
-      //   totalCustomers,
-      // });
+      setOrderStatusData(orderStatusBreakdown);
+      setTopProducts(topProductsData);
+      setMostRatedProducts(topProductsData); // Using same as top selling for now
+      setTopCustomers(topCustomersData);
     } catch (err: any) {
       console.error("❌ Error fetching dashboard data:", err);
       setError(
@@ -295,14 +304,12 @@ export default function VendorDashboard() {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
     if (orders.length === 0) {
-      // Return default data if no orders
       return days.map((day) => ({
         label: day,
         value: Math.floor(Math.random() * 5) + 1,
       }));
     }
 
-    // Group orders by day of week for real sales data
     const dayCounts: { [key: string]: number } = {
       Mon: 0,
       Tue: 0,
@@ -333,21 +340,19 @@ export default function VendorDashboard() {
     const weeks = ["Week 1", "Week 2", "Week 3", "Week 4"];
 
     if (orders.length === 0) {
-      // Return default data if no orders
       return weeks.map((week) => ({
         label: week,
         value: Math.floor(Math.random() * 200) + 50,
       }));
     }
 
-    // Group revenue by weeks for real revenue data
     const weekRevenue: number[] = [0, 0, 0, 0];
 
     orders.forEach((order) => {
       try {
         const orderDate = new Date(order.created_at);
         const week = Math.floor((orderDate.getDate() - 1) / 7);
-        const weekIndex = Math.min(week, 3); // 0-3 for weeks 1-4
+        const weekIndex = Math.min(week, 3);
 
         const orderTotal = parseFloat(order.total_amount) || 0;
         weekRevenue[weekIndex] += orderTotal;
@@ -360,6 +365,78 @@ export default function VendorDashboard() {
       label: week,
       value: Math.max(0, weekRevenue[index] || 0),
     }));
+  };
+
+  const generateTopProducts = (orders: any[], allItems: any[]): any[] => {
+    const productCounts: { [key: string]: { count: number; item: any } } = {};
+
+    orders.forEach((order: any) => {
+      if (order.order_items && Array.isArray(order.order_items)) {
+        order.order_items.forEach((orderItem: any) => {
+          const itemId = orderItem.item_id || orderItem.id;
+          if (itemId) {
+            if (!productCounts[itemId]) {
+              productCounts[itemId] = { count: 0, item: orderItem };
+            }
+            productCounts[itemId].count += orderItem.quantity || 1;
+          }
+        });
+      }
+    });
+
+    const topProductsArray = Object.values(productCounts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((p) => {
+        const item = allItems.find((i: any) => i.id === p.item.item_id || i.id === p.item.id) || p.item;
+        return {
+          name: item.item_name || item.name || "Unknown Product",
+          price: `$${parseFloat(item.price || 0).toFixed(2)}`,
+          rating: 4.5,
+          orders: p.count,
+          image: item.cover_image_url || item.image || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
+        };
+      });
+
+    if (topProductsArray.length === 0) {
+      return allItems.slice(0, 4).map((item: any) => ({
+        name: item.item_name || "Product",
+        price: `$${parseFloat(item.price || 0).toFixed(2)}`,
+        rating: 4.5,
+        orders: 0,
+        image: item.cover_image_url || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
+      }));
+    }
+
+    return topProductsArray;
+  };
+
+  const generateTopCustomers = (orders: any[]): any[] => {
+    const customerOrders: { [key: string]: { name: string; phone: string; count: number } } = {};
+
+    orders.forEach((order: any) => {
+      const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Unknown';
+      const customerPhone = order.customer_phone || '**********';
+      const key = `${customerName}_${customerPhone}`;
+
+      if (!customerOrders[key]) {
+        customerOrders[key] = {
+          name: customerName,
+          phone: customerPhone,
+          count: 0,
+        };
+      }
+      customerOrders[key].count++;
+    });
+
+    return Object.values(customerOrders)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((c) => ({
+        name: c.name,
+        phone: c.phone,
+        orders: c.count,
+      }));
   };
 
   const handleAddProduct = () => {
@@ -381,7 +458,10 @@ export default function VendorDashboard() {
   if (loading && !refreshing) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading dashboard data...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <div className="text-lg text-gray-600">Loading dashboard data...</div>
+        </div>
       </div>
     );
   }
@@ -440,52 +520,96 @@ export default function VendorDashboard() {
     },
   ];
 
+  const completionRate = vendorStats.totalOrders > 0
+    ? Math.round((vendorStats.completedOrders / vendorStats.totalOrders) * 100)
+    : 0;
+
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl text-white p-6 lg:p-8">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold mb-2">
-              Welcome to Vendor Dashboard! 🏪
-              {vendorId && (
-                <span className="text-sm ml-2 opacity-80">
-                  (Vendor ID: {vendorId})
-                </span>
-              )}
-            </h1>
-            <p className="text-blue-100">
-              {vendorStats.totalOrders > 0
-                ? `You have ${
-                    vendorStats.totalOrders
-                  } total orders and $${vendorStats.revenue.toFixed(
-                    2
-                  )} in revenue`
-                : "Start by adding products to see orders and revenue"}
-            </p>
+    <div className="space-y-6 pb-6">
+      {/* Hero Welcome Section */}
+      <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-5"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative p-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm p-3 rounded-xl">
+                  <Store className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl lg:text-4xl font-bold text-white mb-1">
+                    Vendor Dashboard
+                  </h1>
+                  {vendorId && (
+                    <p className="text-white text-opacity-80 text-sm">
+                      Vendor ID: {vendorId}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="text-white text-opacity-90 text-lg mb-4">
+                {vendorStats.totalOrders > 0
+                  ? `You have ${vendorStats.totalOrders} total orders and $${vendorStats.revenue.toFixed(2)} in revenue this month`
+                  : "Start by adding products to see orders and revenue"}
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Activity className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      {vendorStats.totalOrders} Orders
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      ${vendorStats.revenue.toFixed(2)} Revenue
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      {vendorStats.growth}% Growth
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={fetchDashboardData}
+              disabled={refreshing}
+              className="bg-white text-red-600 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50 flex items-center gap-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              <RefreshCw
+                className={`w-5 h-5 ${refreshing ? "animate-spin" : ""}`}
+              />
+              {refreshing ? "Refreshing..." : "Refresh Data"}
+            </button>
           </div>
-          <button
-            onClick={fetchDashboardData}
-            disabled={refreshing}
-            className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
-            />
-            {refreshing ? "Refreshing..." : "Refresh Data"}
-          </button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-red-800">
-              <strong>Error:</strong> {error}
+            <div className="flex items-center space-x-3">
+              <div className="bg-red-100 p-2 rounded-lg">
+                <Activity className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <strong className="text-red-800 block">Error Loading Data</strong>
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
             </div>
             <button
               onClick={fetchDashboardData}
-              className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+              className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition-colors font-medium"
             >
               Retry
             </button>
@@ -493,87 +617,256 @@ export default function VendorDashboard() {
         </div>
       )}
 
-      {/* Main Stats */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-xl lg:text-2xl font-semibold text-gray-800 mb-6">
-          Business Overview
-        </h2>
+      {/* Main Stats Cards */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-3">
+            <div className="bg-red-50 p-2 rounded-lg">
+              <Activity className="w-6 h-6 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Business Overview
+            </h2>
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
           {statsCards.map((stat, index) => (
-            <StatsCard key={index} {...stat} />
+            <div
+              key={index}
+              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-3 rounded-xl bg-${stat.color}-50`}>
+                  <stat.icon className={`w-6 h-6 text-${stat.color}-600`} />
+                </div>
+                {stat.title === "Growth" && (
+                  <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded-full">
+                    +{vendorStats.growth}%
+                  </span>
+                )}
+              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                {stat.title}
+              </h3>
+              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+            </div>
           ))}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
           {additionalStats.map((stat, index) => (
-            <StatsCard key={index} {...stat} />
+            <div
+              key={index}
+              className="group relative bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={`p-3 rounded-xl bg-${stat.color}-50`}>
+                  <stat.icon className={`w-6 h-6 text-${stat.color}-600`} />
+                </div>
+              </div>
+              <h3 className="text-sm font-medium text-gray-600 mb-2">
+                {stat.title}
+              </h3>
+              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+            </div>
           ))}
         </div>
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Chart
-          title="Daily Sales (Orders per Day)"
-          data={salesData}
-          type="line"
-          color="rgb(59, 130, 246)"
-        />
-        <Chart
-          title="Weekly Revenue"
-          data={revenueData}
-          type="bar"
-          color="rgb(16, 185, 129)"
-        />
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-50 p-2 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Daily Sales</h3>
+            </div>
+          </div>
+          <Chart
+            title="Daily Sales (Orders per Day)"
+            data={salesData}
+            type="line"
+            color="rgb(59, 130, 246)"
+          />
+        </div>
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="bg-green-50 p-2 rounded-lg">
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Weekly Revenue</h3>
+            </div>
+          </div>
+          <Chart
+            title="Weekly Revenue"
+            data={revenueData}
+            type="bar"
+            color="rgb(16, 185, 129)"
+          />
+        </div>
+      </div>
+
+      {/* Order Status Statistics & Recent Orders */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-1">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <OrderStatusChart data={orderStatusData} />
+          </div>
+        </div>
+        <div className="xl:col-span-2">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+            <RecentOrders orders={recentOrders} />
+          </div>
+        </div>
+      </div>
+
+      {/* Products and Customers Section */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Top Selling Products
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {topProducts.length > 0 ? (
+              topProducts.map((product, index) => (
+                <ProductCard key={index} {...product} />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No products yet</p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Most Rated Products
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {mostRatedProducts.length > 0 ? (
+              mostRatedProducts.map((product, index) => (
+                <ProductCard key={index} {...product} />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No products yet</p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Top Customers
+              </h3>
+              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View All
+              </button>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {topCustomers.length > 0 ? (
+              topCustomers.map((customer, index) => (
+                <CustomerCard key={index} {...customer} />
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">No customers yet</p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Recent Orders & Quick Actions */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <RecentOrders orders={recentOrders} />
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
-            Quick Actions
-          </h3>
-          <div className="space-y-3">
-            <button
-              onClick={handleAddProduct}
-              className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Add New Product
-            </button>
-            <button
-              onClick={handleViewAllOrders}
-              className="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 transition-colors"
-            >
-              View All Orders ({vendorStats.totalOrders})
-            </button>
+        {/* Quick Actions & Performance */}
+        <div className="space-y-6">
+          {/* Quick Actions */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8 hover:shadow-md transition-shadow">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="bg-purple-50 p-2 rounded-lg">
+                <Zap className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Quick Actions</h3>
+            </div>
+            <div className="space-y-3">
+              <button
+                onClick={handleAddProduct}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add New Product</span>
+              </button>
+              <button
+                onClick={handleViewAllOrders}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all flex items-center justify-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                <span>View All Orders</span>
+                <span className="bg-white bg-opacity-20 px-2 py-1 rounded-full text-sm">
+                  {vendorStats.totalOrders}
+                </span>
+              </button>
+            </div>
           </div>
 
-          {/* Real-time Performance Metrics */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Performance Metrics
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {vendorStats.averageRating?.toFixed(1) || "4.8"}
-                </div>
-                <div className="text-sm text-green-700">Average Rating</div>
+          {/* Performance Metrics */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:p-8 hover:shadow-md transition-shadow">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="bg-orange-50 p-2 rounded-lg">
+                <Award className="w-5 h-5 text-orange-600" />
               </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {vendorStats.totalOrders > 0
-                    ? `${Math.round(
-                        (vendorStats.completedOrders /
-                          vendorStats.totalOrders) *
-                          100
-                      )}%`
-                    : "0%"}
+              <h3 className="text-xl font-bold text-gray-800">Performance Metrics</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
+                <div className="flex items-center justify-between mb-2">
+                  <Star className="w-5 h-5 text-green-600" />
+                  <span className="text-3xl font-bold text-green-700">
+                    {vendorStats.averageRating?.toFixed(1) || "4.8"}
+                  </span>
                 </div>
-                <div className="text-sm text-blue-700">
-                  Order Completion Rate
+                <p className="text-sm font-medium text-green-800">Average Rating</p>
+                <div className="flex items-center space-x-1 mt-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={`w-4 h-4 ${
+                        star <= Math.round(vendorStats.averageRating || 4.8)
+                          ? "text-yellow-400 fill-current"
+                          : "text-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <CheckCircle className="w-5 h-5 text-blue-600" />
+                  <span className="text-3xl font-bold text-blue-700">
+                    {completionRate}%
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-blue-800">Completion Rate</p>
+                <div className="mt-3 bg-blue-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${completionRate}%` }}
+                  ></div>
                 </div>
               </div>
             </div>

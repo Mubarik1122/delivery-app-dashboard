@@ -22,6 +22,9 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  DollarSign,
+  Info,
+  AlertCircle,
 } from "lucide-react";
 import {
   apiService,
@@ -29,6 +32,8 @@ import {
   CreateUpdateItemRequest,
   UpdateItemRequest,
   Category,
+  Addon,
+  ItemSize,
 } from "../services/api";
 
 export default function ItemsPage() {
@@ -36,6 +41,7 @@ export default function ItemsPage() {
   const location = useLocation();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [addons, setAddons] = useState<Addon[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,6 +62,7 @@ export default function ItemsPage() {
   const [backgroundImagePreview, setBackgroundImagePreview] =
     useState<string>("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showAddonDropdown, setShowAddonDropdown] = useState(false);
   const [formData, setFormData] = useState({
     itemName: "",
     shortDescription: "",
@@ -63,6 +70,8 @@ export default function ItemsPage() {
     coverImageUrl: "",
     backgroundImageUrl: "",
     categoryIds: [] as number[],
+    addonIds: [] as number[],
+    sizes: [] as ItemSize[],
     quantity: 0,
     price: 0,
   });
@@ -90,6 +99,8 @@ export default function ItemsPage() {
         coverImageUrl: item.coverImageUrl,
         backgroundImageUrl: item.backgroundImageUrl,
         categoryIds: item.categoryIds,
+        addonIds: item.addonIds || [],
+        sizes: item.sizes || [],
         quantity: Number(item.quantity) || 0,
         price: parseFloat(String(item.price)) || 0,
       });
@@ -109,9 +120,32 @@ export default function ItemsPage() {
   const DEFAULT_BACKGROUND_IMAGE =
     "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=800";
 
+  // Image base URL from environment variable (only for images, not for API calls)
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return DEFAULT_COVER_IMAGE;
+    
+    // Trim the path to remove any leading/trailing spaces
+    const trimmedPath = imagePath.trim();
+    
+    // If already a full URL (starts with http:// or https://), return as is
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    
+    // Remove leading slash if present
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    
+    // Join base URL and path without double slashes
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
   useEffect(() => {
     loadItems();
     loadCategories();
+    loadAddons();
   }, []);
 
   const loadItems = async () => {
@@ -132,14 +166,24 @@ export default function ItemsPage() {
           shortDescription:
             item.short_description || item.shortDescription || "",
           longDescription: item.long_description || item.longDescription || "",
-          coverImageUrl:
-            item.cover_image_url || item.coverImageUrl || DEFAULT_COVER_IMAGE,
+          coverImageUrl: getImageUrl(item.cover_image_url || item.coverImageUrl) || DEFAULT_COVER_IMAGE,
           backgroundImageUrl:
             item.background_image_url ||
             item.backgroundImageUrl ||
             DEFAULT_BACKGROUND_IMAGE,
           categoryIds: Array.isArray(item.categories)
             ? item.categories.map((cat: any) => cat.id)
+            : [],
+          addonIds: Array.isArray(item.addons)
+            ? item.addons.map((addon: any) => Number(addon.id || addon))
+            : Array.isArray(item.addon_ids)
+            ? item.addon_ids.map((id: any) => Number(id))
+            : [],
+          sizes: Array.isArray(item.sizes)
+            ? item.sizes.map((size: any) => ({
+                sizeName: size.size_name || size.sizeName || "",
+                price: typeof size.price === 'string' ? parseFloat(size.price) : (typeof size.price === 'number' ? size.price : 0),
+              }))
             : [],
           quantity: Number(item.quantity) || 0,
           // <-- updated price mapping: prefer unit_price, then price
@@ -178,7 +222,7 @@ export default function ItemsPage() {
           shortDescription: cat.short_description || cat.shortDescription,
           longDescription: cat.long_description || cat.longDescription,
           isSubCategory: cat.is_sub_category || cat.isSubCategory,
-          coverImage: cat.cover_image || cat.coverImage || DEFAULT_COVER_IMAGE,
+          coverImage: getImageUrl(cat.cover_image || cat.coverImage),
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
@@ -189,6 +233,30 @@ export default function ItemsPage() {
       }
     } catch (error) {
       console.error("Error loading categories:", error);
+    }
+  };
+
+  const loadAddons = async () => {
+    try {
+      const response = await apiService.getAllAddons();
+      if (response.errorCode === 0 && response.data) {
+        // Map snake_case API response to camelCase and filter only active addons
+        const mapped = response.data
+          .map((addon: any) => ({
+            id: addon.id,
+            addonName: addon.addon_name || addon.addonName,
+            description: addon.description,
+            price: typeof addon.price === 'string' ? parseFloat(addon.price) : (typeof addon.price === 'number' ? addon.price : 0),
+            isActive: addon.is_active !== undefined ? addon.is_active : addon.isActive,
+            createdAt: addon.created_at || addon.createdAt,
+            updatedAt: addon.updated_at || addon.updatedAt,
+            userId: addon.user_id || addon.userId,
+          }))
+          .filter((addon: Addon) => addon.isActive); // Only active addons
+        setAddons(mapped);
+      }
+    } catch (error) {
+      console.error("Error loading addons:", error);
     }
   };
 
@@ -265,6 +333,8 @@ export default function ItemsPage() {
       coverImageUrl: "",
       backgroundImageUrl: "",
       categoryIds: [],
+      addonIds: [],
+      sizes: [],
       quantity: 0,
       price: 0,
     });
@@ -346,7 +416,7 @@ export default function ItemsPage() {
       const finalBackgroundImage =
         formData.backgroundImageUrl.trim() || DEFAULT_BACKGROUND_IMAGE;
 
-      const itemData = {
+      const itemData: CreateUpdateItemRequest = {
         ...(editingItem && { id: editingItem.id }),
         itemName: formData.itemName.trim(),
         shortDescription: formData.shortDescription.trim(),
@@ -354,6 +424,8 @@ export default function ItemsPage() {
         coverImageUrl: finalCoverImage,
         backgroundImageUrl: finalBackgroundImage,
         categoryIds: formData.categoryIds,
+        addonIds: formData.addonIds.length > 0 ? formData.addonIds : undefined,
+        sizes: formData.sizes.length > 0 ? formData.sizes : undefined,
         quantity: Number(formData.quantity),
         price: parseFloat(String(formData.price)),
       };
@@ -405,7 +477,7 @@ export default function ItemsPage() {
 
   const handleInputChange = (
     field: string,
-    value: string | number | number[]
+    value: string | number | number[] | ItemSize[]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -450,6 +522,43 @@ export default function ItemsPage() {
     handleInputChange("categoryIds", newCategoryIds);
   };
 
+  const handleAddonToggle = (addonId: number) => {
+    const newAddonIds = formData.addonIds.includes(addonId)
+      ? formData.addonIds.filter((id) => id !== addonId)
+      : [...formData.addonIds, addonId];
+    handleInputChange("addonIds", newAddonIds);
+  };
+
+  const handleAddSize = () => {
+    // Get available sizes (not already selected)
+    const availableSizes = ["Small", "Medium", "Large"].filter(
+      (size) => !formData.sizes.some((s) => s.sizeName === size)
+    );
+    
+    if (availableSizes.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "All Sizes Added",
+        text: "You have already added all available sizes (Small, Medium, Large).",
+      });
+      return;
+    }
+    
+    const newSizes = [...formData.sizes, { sizeName: availableSizes[0], price: 0 }];
+    handleInputChange("sizes", newSizes);
+  };
+
+  const handleRemoveSize = (index: number) => {
+    const newSizes = formData.sizes.filter((_, i) => i !== index);
+    handleInputChange("sizes", newSizes);
+  };
+
+  const handleSizeChange = (index: number, field: "sizeName" | "price", value: string | number) => {
+    const newSizes = [...formData.sizes];
+    newSizes[index] = { ...newSizes[index], [field]: value };
+    handleInputChange("sizes", newSizes);
+  };
+
   const getCategoryNames = (categoryIds: number[]) => {
     return categories
       .filter((cat) => categoryIds.includes(cat.id))
@@ -459,54 +568,65 @@ export default function ItemsPage() {
 
   if (showAddForm) {
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+      <div className="space-y-6 pb-6">
+        {/* Hero Header */}
+        <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="absolute inset-0 bg-black opacity-5"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full -mr-48 -mt-48"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full -ml-32 -mb-32"></div>
+          <div className="relative p-8">
+            <div className="flex items-center justify-between mb-6">
               <button
                 type="button"
                 onClick={() => {
                   navigate("/items");
                   resetForm();
                 }}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-opacity-30 transition-all flex items-center space-x-2 font-medium shadow-lg"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back to Items</span>
               </button>
             </div>
-          </div>
-          <div className="mt-4">
-            <h1 className="text-2xl font-bold text-gray-800">
-              {editingItem ? "Edit Item" : "Add New Item"}
-            </h1>
-            <p className="text-gray-600">
-              {editingItem
-                ? "Update item information"
-                : "Create a new item for your menu"}
-            </p>
+            <div className="flex items-center space-x-4">
+              <div className="bg-white bg-opacity-20 backdrop-blur-sm p-4 rounded-xl">
+                <Package className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">
+                  {editingItem ? "Edit Item" : "Add New Item"}
+                </h1>
+                <p className="text-white text-opacity-90 text-lg">
+                  {editingItem
+                    ? "Update item information and details"
+                    : "Create a new item for your menu"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
-              {error}
+            <div className="bg-gradient-to-r from-red-50 to-red-100 border-2 border-red-300 text-red-800 px-6 py-4 rounded-xl text-sm mb-6 flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="font-medium">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Item Information */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Item Information
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Item Information
+                </h3>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Item Name *
+                    Item Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -514,8 +634,8 @@ export default function ItemsPage() {
                     onChange={(e) =>
                       handleInputChange("itemName", e.target.value)
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter item name"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                    placeholder="e.g., Margherita Pizza"
                     required
                     disabled={isSubmitting}
                   />
@@ -531,8 +651,8 @@ export default function ItemsPage() {
                     onChange={(e) =>
                       handleInputChange("shortDescription", e.target.value)
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter short description"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                    placeholder="A brief description of the item"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -547,70 +667,82 @@ export default function ItemsPage() {
                       handleInputChange("longDescription", e.target.value)
                     }
                     rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter detailed description of the item"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400 resize-none"
+                    placeholder="Provide detailed information about the item"
                     disabled={isSubmitting}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Price ($) *
+                    Price <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "price",
-                        parseFloat(e.target.value) || 0
-                      )
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter item price"
-                    required
-                    disabled={isSubmitting}
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <DollarSign className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.price}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "price",
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                      placeholder="0.00"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quantity in Stock *
+                    Quantity in Stock <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={(e) =>
-                      handleInputChange(
-                        "quantity",
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter quantity in stock"
-                    required
-                    disabled={isSubmitting}
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Package className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.quantity}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "quantity",
+                          parseInt(e.target.value) || 0
+                        )
+                      }
+                      className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                      placeholder="0"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Category Selection */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Categories
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Categories
+                </h3>
+              </div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Categories *
+                Select Categories <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 {/* Multi-select dropdown trigger */}
                 <div
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer bg-white min-h-[48px] flex items-center justify-between"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer bg-white min-h-[42px] flex items-center justify-between hover:border-gray-400 transition-all"
                 >
                   <div className="flex-1">
                     {formData.categoryIds.length === 0 ? (
@@ -629,7 +761,7 @@ export default function ItemsPage() {
                               className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
                             >
                               <img
-                                src={category.coverImage}
+                                src={getImageUrl(category.coverImage)}
                                 alt={category.categoryName}
                                 className="w-4 h-4 rounded-full object-cover"
                                 onError={(e) => {
@@ -753,7 +885,7 @@ export default function ItemsPage() {
                                 disabled={isSubmitting}
                               />
                               <img
-                                src={category.coverImage}
+                                src={getImageUrl(category.coverImage)}
                                 alt={category.categoryName}
                                 className="w-8 h-8 rounded-lg object-cover border border-gray-200"
                                 onError={(e) => {
@@ -805,14 +937,302 @@ export default function ItemsPage() {
               )}
             </div>
 
+            {/* Addons Selection */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Addons (Optional)
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Select addons that can be added to this item
+                </p>
+              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Addons
+              </label>
+              <div className="relative">
+                {/* Multi-select dropdown trigger */}
+                <div
+                  onClick={() => setShowAddonDropdown(!showAddonDropdown)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer bg-white min-h-[42px] flex items-center justify-between hover:border-gray-400 transition-all"
+                >
+                  <div className="flex-1">
+                    {formData.addonIds.length === 0 ? (
+                      <span className="text-gray-500">
+                        Select addons (optional)...
+                      </span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {formData.addonIds.slice(0, 3).map((addonId) => {
+                          const addon = addons.find(
+                            (a) => a.id === addonId
+                          );
+                          return addon ? (
+                            <span
+                              key={addonId}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs"
+                            >
+                              {addon.addonName}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddonToggle(addonId);
+                                }}
+                                className="ml-1 hover:bg-purple-200 rounded-full p-0.5"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                        {formData.addonIds.length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                            +{formData.addonIds.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {formData.addonIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleInputChange("addonIds", []);
+                        }}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                        title="Clear all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div
+                      className={`transform transition-transform ${
+                        showAddonDropdown ? "rotate-180" : ""
+                      }`}
+                    >
+                      <svg
+                        className="w-4 h-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dropdown menu */}
+                {showAddonDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {addons.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        No active addons available
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {/* Select All / Deselect All */}
+                        <div className="flex items-center justify-between p-2 border-b border-gray-100 mb-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            {formData.addonIds.length} of {addons.length}{" "}
+                            selected
+                          </span>
+                          <div className="flex space-x-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleInputChange(
+                                  "addonIds",
+                                  addons.map((a) => a.id)
+                                )
+                              }
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Select All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleInputChange("addonIds", [])
+                              }
+                              className="text-xs text-red-600 hover:text-red-800"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Addon options */}
+                        <div className="space-y-1">
+                          {addons.map((addon) => (
+                            <label
+                              key={addon.id}
+                              className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formData.addonIds.includes(addon.id)}
+                                onChange={() => handleAddonToggle(addon.id)}
+                                className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                disabled={isSubmitting}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {addon.addonName}
+                                  </span>
+                                  <span className="text-xs text-gray-500 ml-2">
+                                    ${typeof addon.price === 'number' ? addon.price.toFixed(2) : parseFloat(String(addon.price || 0)).toFixed(2)}
+                                  </span>
+                                </div>
+                                {addon.description && (
+                                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                                    {addon.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Click outside to close dropdown */}
+                {showAddonDropdown && (
+                  <div
+                    className="fixed inset-0 z-0"
+                    onClick={() => setShowAddonDropdown(false)}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Sizes Section */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      Sizes (Optional)
+                    </h3>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Add different sizes with prices for this item
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddSize}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
+                    disabled={isSubmitting}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Size
+                  </button>
+                </div>
+              </div>
+
+              {formData.sizes.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                  <Package className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">
+                    No sizes added. Click "Add Size" to add size options.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {formData.sizes.map((size, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200"
+                    >
+                      <div className="flex-1 grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Size Name
+                          </label>
+                          <select
+                            value={size.sizeName}
+                            onChange={(e) =>
+                              handleSizeChange(index, "sizeName", e.target.value)
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm bg-white"
+                            disabled={isSubmitting}
+                          >
+                            <option value="">Select Size</option>
+                            {["Small", "Medium", "Large"]
+                              .filter(
+                                (availableSize) =>
+                                  !formData.sizes.some(
+                                    (s, i) => s.sizeName === availableSize && i !== index
+                                  )
+                              )
+                              .map((availableSize) => (
+                                <option key={availableSize} value={availableSize}>
+                                  {availableSize}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            Price
+                          </label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={size.price}
+                              onChange={(e) =>
+                                handleSizeChange(
+                                  index,
+                                  "price",
+                                  parseFloat(e.target.value) || 0
+                                )
+                              }
+                              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm"
+                              placeholder="0.00"
+                              disabled={isSubmitting}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSize(index)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        disabled={isSubmitting}
+                        title="Remove size"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Cover Image Upload */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Cover Image
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Cover Image
+                </h3>
+              </div>
 
               <div className="mb-4">
-                <div className="flex space-x-4">
+                <div className="flex space-x-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -820,10 +1240,10 @@ export default function ItemsPage() {
                       setSelectedCoverFile(null);
                       setCoverImagePreview("");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       imageUploadMethod === "url"
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -836,10 +1256,10 @@ export default function ItemsPage() {
                       setImageUploadMethod("upload");
                       handleInputChange("coverImageUrl", "");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       imageUploadMethod === "upload"
                         ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -861,8 +1281,8 @@ export default function ItemsPage() {
                       handleInputChange("coverImageUrl", e.target.value);
                       setCoverImagePreview(e.target.value);
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter cover image URL or leave empty for default"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                    placeholder="https://example.com/image.jpg"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -871,9 +1291,9 @@ export default function ItemsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload Cover Image
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-all bg-gray-50">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-gray-700 mb-1">
                       {selectedCoverFile
                         ? selectedCoverFile.name
                         : "Click to upload or drag and drop"}
@@ -894,7 +1314,7 @@ export default function ItemsPage() {
                       onClick={() =>
                         document.getElementById("cover-image-upload")?.click()
                       }
-                      className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all text-sm font-medium flex items-center space-x-2 mx-auto"
                       disabled={isSubmitting}
                     >
                       <ImageIcon className="w-4 h-4" />
@@ -910,11 +1330,7 @@ export default function ItemsPage() {
                     Cover Image Preview
                   </label>
                   <img
-                    src={
-                      coverImagePreview ||
-                      formData.coverImageUrl ||
-                      DEFAULT_COVER_IMAGE
-                    }
+                    src={getImageUrl(coverImagePreview || formData.coverImageUrl)}
                     alt="Cover Preview"
                     className="w-32 h-32 object-cover rounded-lg border border-gray-200"
                     onError={(e) => {
@@ -926,13 +1342,15 @@ export default function ItemsPage() {
             </div>
 
             {/* Background Image Upload */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Background Image
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Background Image
+                </h3>
+              </div>
 
               <div className="mb-4">
-                <div className="flex space-x-4">
+                <div className="flex space-x-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -940,10 +1358,10 @@ export default function ItemsPage() {
                       setSelectedBackgroundFile(null);
                       setBackgroundImagePreview("");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       backgroundImageMethod === "url"
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -956,10 +1374,10 @@ export default function ItemsPage() {
                       setBackgroundImageMethod("upload");
                       handleInputChange("backgroundImageUrl", "");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       backgroundImageMethod === "upload"
                         ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -981,8 +1399,8 @@ export default function ItemsPage() {
                       handleInputChange("backgroundImageUrl", e.target.value);
                       setBackgroundImagePreview(e.target.value);
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter background image URL or leave empty for default"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white text-gray-900 placeholder-gray-400"
+                    placeholder="https://example.com/background.jpg"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -991,9 +1409,9 @@ export default function ItemsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload Background Image
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-all bg-gray-50">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-gray-700 mb-1">
                       {selectedBackgroundFile
                         ? selectedBackgroundFile.name
                         : "Click to upload or drag and drop"}
@@ -1016,7 +1434,7 @@ export default function ItemsPage() {
                           .getElementById("background-image-upload")
                           ?.click()
                       }
-                      className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all text-sm font-medium flex items-center space-x-2 mx-auto"
                       disabled={isSubmitting}
                     >
                       <ImageIcon className="w-4 h-4" />
@@ -1032,13 +1450,9 @@ export default function ItemsPage() {
                     Background Image Preview
                   </label>
                   <img
-                    src={
-                      backgroundImagePreview ||
-                      formData.backgroundImageUrl ||
-                      DEFAULT_BACKGROUND_IMAGE
-                    }
+                    src={getImageUrl(backgroundImagePreview || formData.backgroundImageUrl)}
                     alt="Background Preview"
-                    className="w-64 h-32 object-cover rounded-lg border border-gray-200"
+                    className="w-full max-w-md h-40 object-cover rounded-lg border border-gray-200"
                     onError={(e) => {
                       e.currentTarget.src = DEFAULT_BACKGROUND_IMAGE;
                     }}
@@ -1048,16 +1462,27 @@ export default function ItemsPage() {
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex space-x-4 pt-6">
+            <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate("/items");
+                  resetForm();
+                }}
+                disabled={isSubmitting}
+                className="bg-white text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-50 transition-all font-medium border border-gray-300 hover:border-gray-400"
+              >
+                Cancel
+              </button>
               <button
                 type="submit"
                 disabled={isSubmitting || formData.categoryIds.length === 0}
-                className="bg-red-500 text-white px-8 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-red-500 text-white px-6 py-2.5 rounded-lg hover:bg-red-600 transition-all flex items-center space-x-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
-                  <Loader className="w-5 h-5 animate-spin" />
+                  <Loader className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Save className="w-5 h-5" />
+                  <Save className="w-4 h-4" />
                 )}
                 <span>
                   {isSubmitting
@@ -1069,17 +1494,6 @@ export default function ItemsPage() {
                     : "Create Item"}
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  navigate("/items");
-                  resetForm();
-                }}
-                disabled={isSubmitting}
-                className="bg-gray-100 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                Cancel
-              </button>
             </div>
           </form>
         </div>
@@ -1089,25 +1503,37 @@ export default function ItemsPage() {
 
   return (
     <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">
-                🍽️ Items Management
-              </h1>
-              <p className="text-gray-600">
-                Manage your menu items and products
-              </p>
+      <div className="space-y-6 pb-6">
+        {/* Hero Header */}
+        <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="absolute inset-0 bg-black opacity-5"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+          <div className="relative p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="bg-white bg-opacity-20 backdrop-blur-sm p-3 rounded-xl">
+                    <Package className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl lg:text-4xl font-bold text-white mb-1">
+                      Items Management
+                    </h1>
+                    <p className="text-white text-opacity-90">
+                      Manage your menu items and products
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleAddItem}
+                className="bg-white text-red-600 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all flex items-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add New Item</span>
+              </button>
             </div>
-            <button
-              onClick={handleAddItem}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add New Item</span>
-            </button>
           </div>
         </div>
 
@@ -1119,94 +1545,66 @@ export default function ItemsPage() {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="group relative bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 rounded-xl border-2 border-blue-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Items</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-sm font-semibold text-blue-600 mb-1">Total Items</p>
+                <p className="text-3xl font-bold text-blue-700">
                   {items.length}
                 </p>
+                <p className="text-xs text-blue-500 mt-1">All items in inventory</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-xl">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="bg-blue-200 p-4 rounded-xl group-hover:scale-110 transition-transform">
+                <Package className="w-8 h-8 text-blue-600" />
               </div>
             </div>
+            <div className="absolute top-0 right-0 w-20 h-20 bg-blue-200 opacity-20 rounded-full -mr-10 -mt-10"></div>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="group relative bg-gradient-to-br from-orange-50 via-orange-50 to-orange-100 rounded-xl border-2 border-orange-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">
+                <p className="text-sm font-semibold text-orange-600 mb-1">
                   Filtered Results
                 </p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-3xl font-bold text-orange-700">
                   {filteredItems.length}
                 </p>
+                <p className="text-xs text-orange-500 mt-1">Matching your search</p>
               </div>
-              <div className="p-3 bg-orange-100 rounded-xl">
-                <Filter className="w-6 h-6 text-orange-600" />
+              <div className="bg-orange-200 p-4 rounded-xl group-hover:scale-110 transition-transform">
+                <Filter className="w-8 h-8 text-orange-600" />
               </div>
             </div>
+            <div className="absolute top-0 right-0 w-20 h-20 bg-orange-200 opacity-20 rounded-full -mr-10 -mt-10"></div>
           </div>
-
-          {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Current Page
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {currentPage} / {totalPages || 1}
-                </p>
-              </div>
-              <div className="p-3 bg-purple-100 rounded-xl">
-                <Package className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Items per Page
-                </p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {itemsPerPage}
-                </p>
-              </div>
-              <div className="p-3 bg-green-100 rounded-xl">
-                <Package className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div> */}
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search Input */}
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Search items by name or description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full pl-12 pr-4 py-3.5 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                 />
               </div>
             </div>
 
             {/* Category Filter Dropdown */}
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+              <Filter className="w-5 h-5 text-gray-500" />
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="bg-transparent border-none focus:outline-none focus:ring-0 text-gray-700 font-medium cursor-pointer"
               >
                 {categoryOptions.map((category) => (
                   <option key={category} value={category}>
@@ -1217,15 +1615,15 @@ export default function ItemsPage() {
             </div>
 
             {/* Items per page selector */}
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Show:</span>
+            <div className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+              <span className="text-sm text-gray-600 font-medium">Show:</span>
               <select
                 value={itemsPerPage}
                 onChange={(e) => {
                   setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="bg-transparent border-none focus:outline-none focus:ring-0 text-gray-700 font-medium cursor-pointer"
               >
                 <option value={5}>5</option>
                 <option value={10}>10</option>
@@ -1251,51 +1649,51 @@ export default function ItemsPage() {
 
         {/* DataTable */}
         {!loading && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Image
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort("itemName")}
-                        className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                        className="flex items-center space-x-2 hover:text-red-600 transition-colors group"
                       >
                         <span>Item Name</span>
-                        <ArrowUpDown className="w-4 h-4" />
+                        <ArrowUpDown className="w-4 h-4 group-hover:text-red-600" />
                       </button>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort("shortDescription")}
-                        className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                        className="flex items-center space-x-2 hover:text-red-600 transition-colors group"
                       >
                         <span>Description</span>
-                        <ArrowUpDown className="w-4 h-4" />
+                        <ArrowUpDown className="w-4 h-4 group-hover:text-red-600" />
                       </button>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Price
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Stock
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Categories
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       <button
                         onClick={() => handleSort("createdAt")}
-                        className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                        className="flex items-center space-x-2 hover:text-red-600 transition-colors group"
                       >
                         <span>Created</span>
-                        <ArrowUpDown className="w-4 h-4" />
+                        <ArrowUpDown className="w-4 h-4 group-hover:text-red-600" />
                       </button>
                     </th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -1304,46 +1702,48 @@ export default function ItemsPage() {
                   {paginatedItems.map((item) => (
                     <tr
                       key={item.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-200 group"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <img
-                          src={item.coverImageUrl}
-                          alt={item.itemName}
-                          className="w-12 h-12 rounded-lg object-cover border border-gray-200"
-                          onError={(e) => {
-                            e.currentTarget.src = DEFAULT_COVER_IMAGE;
-                          }}
-                        />
+                        <div className="relative">
+                          <img
+                            src={getImageUrl(item.coverImageUrl)}
+                            alt={item.itemName}
+                            className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200 group-hover:border-red-300 transition-all shadow-sm group-hover:shadow-md"
+                            onError={(e) => {
+                              e.currentTarget.src = DEFAULT_COVER_IMAGE;
+                            }}
+                          />
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className="text-sm font-bold text-gray-900 group-hover:text-red-600 transition-colors">
                               {item.itemName}
                             </div>
-                            <div className="text-sm text-gray-500">
-                              {item.shortDescription}
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {item.shortDescription?.substring(0, 40)}...
                             </div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs truncate">
+                        <div className="text-sm text-gray-700 max-w-xs truncate">
                           {item.shortDescription || "No description"}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-semibold text-green-600">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-bold text-green-700 bg-green-50 border border-green-200">
                           ${(item.price || 0).toFixed(2)}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold ${
                             (item.quantity || 0) > 0
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
+                              ? "bg-green-100 text-green-800 border border-green-300"
+                              : "bg-red-100 text-red-800 border border-red-300"
                           }`}
                         >
                           {item.quantity || 0}{" "}
@@ -1351,7 +1751,7 @@ export default function ItemsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {item.categoryIds.slice(0, 2).map((categoryId) => {
                             const category = categories.find(
                               (cat) => cat.id === categoryId
@@ -1359,48 +1759,48 @@ export default function ItemsPage() {
                             return category ? (
                               <span
                                 key={categoryId}
-                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                               >
                                 {category.categoryName}
                               </span>
                             ) : null;
                           })}
                           {item.categoryIds.length > 2 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
                               +{item.categoryIds.length - 2}
                             </span>
                           )}
                           {item.categoryIds.length === 0 && (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
                               No categories
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {item.createdAt
                           ? new Date(item.createdAt).toLocaleDateString()
                           : "N/A"}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-1">
                           <button
                             onClick={() => handleViewItem(item)}
-                            className="text-blue-600 hover:text-blue-800 transition-colors p-2 hover:bg-blue-50 rounded-lg"
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-all p-2 rounded-lg border border-transparent hover:border-blue-200"
                             title="View Item"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleEditItem(item)}
-                            className="text-green-600 hover:text-green-800 transition-colors p-2 hover:bg-green-50 rounded-lg"
+                            className="text-green-600 hover:text-green-800 hover:bg-green-50 transition-all p-2 rounded-lg border border-transparent hover:border-green-200"
                             title="Edit Item"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteItem(item.id)}
-                            className="text-red-600 hover:text-red-800 transition-colors p-2 hover:bg-red-50 rounded-lg"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 transition-all p-2 rounded-lg border border-transparent hover:border-red-200"
                             title="Delete Item"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1415,12 +1815,12 @@ export default function ItemsPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="bg-white px-6 py-4 flex items-center justify-between border-t border-gray-200">
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 flex items-center justify-between border-t border-gray-200">
                 <div className="flex-1 flex justify-between sm:hidden">
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="relative inline-flex items-center px-4 py-2 border-2 border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     Previous
                   </button>
@@ -1429,30 +1829,30 @@ export default function ItemsPage() {
                       setCurrentPage(Math.min(totalPages, currentPage + 1))
                     }
                     disabled={currentPage === totalPages}
-                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border-2 border-gray-300 text-sm font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     Next
                   </button>
                 </div>
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm text-gray-700">
+                    <p className="text-sm text-gray-700 font-medium">
                       Showing{" "}
-                      <span className="font-medium">{startIndex + 1}</span> to{" "}
-                      <span className="font-medium">
+                      <span className="font-bold text-gray-900">{startIndex + 1}</span> to{" "}
+                      <span className="font-bold text-gray-900">
                         {Math.min(
                           startIndex + itemsPerPage,
                           sortedItems.length
                         )}
                       </span>{" "}
                       of{" "}
-                      <span className="font-medium">{sortedItems.length}</span>{" "}
+                      <span className="font-bold text-gray-900">{sortedItems.length}</span>{" "}
                       results
                     </p>
                   </div>
                   <div>
                     <nav
-                      className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                      className="relative z-0 inline-flex rounded-xl shadow-sm -space-x-px"
                       aria-label="Pagination"
                     >
                       <button
@@ -1460,7 +1860,7 @@ export default function ItemsPage() {
                           setCurrentPage(Math.max(1, currentPage - 1))
                         }
                         disabled={currentPage === 1}
-                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative inline-flex items-center px-3 py-2 rounded-l-xl border-2 border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                       </button>
@@ -1486,10 +1886,10 @@ export default function ItemsPage() {
                             <button
                               key={pageNum}
                               onClick={() => setCurrentPage(pageNum)}
-                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              className={`relative inline-flex items-center px-4 py-2 border-2 text-sm font-semibold transition-all ${
                                 currentPage === pageNum
-                                  ? "z-10 bg-red-50 border-red-500 text-red-600"
-                                  : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                                  ? "z-10 bg-gradient-to-r from-red-500 to-red-600 border-red-600 text-white shadow-lg"
+                                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400"
                               }`}
                             >
                               {pageNum}
@@ -1503,7 +1903,7 @@ export default function ItemsPage() {
                           setCurrentPage(Math.min(totalPages, currentPage + 1))
                         }
                         disabled={currentPage === totalPages}
-                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="relative inline-flex items-center px-3 py-2 rounded-r-xl border-2 border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                       >
                         <ChevronRight className="h-5 w-5" aria-hidden="true" />
                       </button>
@@ -1517,17 +1917,19 @@ export default function ItemsPage() {
 
         {/* Empty State */}
         {!loading && items.length === 0 && !error && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-medium text-gray-800 mb-2">
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border-2 border-gray-200 shadow-lg p-12 text-center">
+            <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Package className="w-10 h-10 text-red-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">
               No Items Found
             </h3>
-            <p className="text-gray-600 mb-6">
-              Get started by creating your first menu item.
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Get started by creating your first menu item to build your inventory.
             </p>
             <button
               onClick={handleAddItem}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 mx-auto"
+              className="bg-gradient-to-r from-red-500 to-red-600 text-white px-8 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all flex items-center space-x-2 mx-auto shadow-lg hover:shadow-xl transform hover:scale-105 font-medium"
             >
               <Plus className="w-5 h-5" />
               <span>Add Your First Item</span>
@@ -1537,23 +1939,24 @@ export default function ItemsPage() {
 
         {/* No Search Results */}
         {!loading && items.length > 0 && filteredItems.length === 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-medium text-gray-800 mb-2">
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl border-2 border-gray-200 shadow-lg p-12 text-center">
+            <div className="bg-orange-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="w-10 h-10 text-orange-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-800 mb-2">
               No Items Match Your Search
             </h3>
-            <p className="text-gray-600 mb-6">
-              Try adjusting your search terms or filters to find what you're
-              looking for.
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Try adjusting your search terms or filters to find what you're looking for.
             </p>
             <button
               onClick={() => {
                 setSearchTerm("");
                 setSelectedCategory("All");
               }}
-              className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              className="bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-all font-medium border border-gray-300"
             >
-              Clear Search
+              Clear Search & Filters
             </button>
           </div>
         )}

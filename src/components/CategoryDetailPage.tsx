@@ -3,13 +3,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   ArrowLeft,
-  CreditCard as Edit,
+  Edit,
   Trash2,
   Package,
   FolderOpen,
   Image as ImageIcon,
   Calendar,
   Tag,
+  Store,
+  Info,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { Category, Item, apiService } from "../services/api";
 
@@ -69,6 +74,28 @@ export default function CategoryDetailPage({
   const DEFAULT_IMAGE =
     "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
 
+  // Image base URL from environment variable (only for images, not for API calls)
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return DEFAULT_IMAGE;
+    
+    // Trim the path to remove any leading/trailing spaces
+    const trimmedPath = imagePath.trim();
+    
+    // If already a full URL (starts with http:// or https://), return as is
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    
+    // Remove leading slash if present
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    
+    // Join base URL and path without double slashes
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
   useEffect(() => {
     if (id) {
       fetchCategoryDetails(id);
@@ -80,22 +107,21 @@ export default function CategoryDetailPage({
       setLoading(true);
       setError(null);
 
-      //console.log("Fetching category details for ID:", categoryId);
-
-      const response = await apiService.getAllCategories();
-      //console.log("API Response:", response);
+      // Fetch category by ID
+      const response = await apiService.getCategoryById(Number(categoryId));
 
       if (response.errorCode === 0 && response.data) {
-        // Map snake_case to camelCase and ensure parentCategoryIds is always an array
-        const mapped = response.data.map((cat: any) => ({
+        const cat: any = response.data;
+        
+        // Map the category data
+        const mappedCategory: Category = {
           id: cat.id,
           categoryName: cat.category_name || cat.categoryName,
           shortDescription: cat.short_description || cat.shortDescription,
           longDescription: cat.long_description || cat.longDescription,
           isSubCategory: cat.is_sub_category || cat.isSubCategory,
-          coverImage: cat.cover_image || cat.coverImage || DEFAULT_IMAGE,
+          coverImage: getImageUrl(cat.cover_image || cat.coverImage),
           parentCategoryIds: (() => {
-            // Handle different possible structures for parent categories
             if (Array.isArray(cat.parent_categories)) {
               return cat.parent_categories.map((p: any) =>
                 typeof p === "object" ? p.id : p
@@ -112,34 +138,49 @@ export default function CategoryDetailPage({
           })(),
           createdAt: cat.creation_timestamp || cat.created_at || cat.createdAt,
           updatedAt: cat.updation_timestamp || cat.updated_at || cat.updatedAt,
-        }));
+        };
 
-        //console.log("Mapped categories:", mapped);
-        setAllCategories(mapped);
+        setCategory(mappedCategory);
 
-        // Find the current category
-        const foundCategory = mapped.find(
-          (cat) => cat.id.toString() === categoryId
-        );
+        // Fetch all categories to find parent and subcategories
+        const allCategoriesResponse = await apiService.getAllCategories();
+        if (allCategoriesResponse.errorCode === 0 && allCategoriesResponse.data) {
+          const mapped = allCategoriesResponse.data.map((cat: any) => ({
+            id: cat.id,
+            categoryName: cat.category_name || cat.categoryName,
+            shortDescription: cat.short_description || cat.shortDescription,
+            longDescription: cat.long_description || cat.longDescription,
+            isSubCategory: cat.is_sub_category || cat.isSubCategory,
+            coverImage: getImageUrl(cat.cover_image || cat.coverImage),
+            parentCategoryIds: (() => {
+              if (Array.isArray(cat.parent_categories)) {
+                return cat.parent_categories.map((p: any) =>
+                  typeof p === "object" ? p.id : p
+                );
+              } else if (Array.isArray(cat.parentCategoryIds)) {
+                return cat.parentCategoryIds;
+              } else if (
+                cat.parent_category_ids &&
+                Array.isArray(cat.parent_category_ids)
+              ) {
+                return cat.parent_category_ids;
+              }
+              return [];
+            })(),
+            createdAt: cat.creation_timestamp || cat.created_at || cat.createdAt,
+            updatedAt: cat.updation_timestamp || cat.updated_at || cat.updatedAt,
+          }));
 
-        //console.log("Found category:", foundCategory);
-
-        if (foundCategory) {
-          setCategory(foundCategory);
+          setAllCategories(mapped);
 
           // Find parent categories by IDs
           if (
-            foundCategory.isSubCategory &&
-            foundCategory.parentCategoryIds?.length > 0
+            mappedCategory.isSubCategory &&
+            mappedCategory.parentCategoryIds?.length > 0
           ) {
-            // //console.log(
-            //   "Finding parents for IDs:",
-            //   foundCategory.parentCategoryIds
-            // );
             const parents = mapped.filter((cat) =>
-              foundCategory.parentCategoryIds?.includes(cat.id)
+              mappedCategory.parentCategoryIds?.includes(cat.id)
             );
-            //console.log("Found parents:", parents);
             setParentCategories(parents);
           } else {
             setParentCategories([]);
@@ -149,21 +190,15 @@ export default function CategoryDetailPage({
           const subCats = mapped.filter(
             (cat) =>
               cat.isSubCategory &&
-              cat.parentCategoryIds?.includes(foundCategory.id)
+              cat.parentCategoryIds?.includes(mappedCategory.id)
           );
-          //console.log("Found subcategories:", subCats);
           setSubCategories(subCats);
-
-          // Set mock products
-          setProducts(mockProducts);
-
-          // Fetch related items
-          fetchRelatedItems(foundCategory.id);
-        } else {
-          setError("Category not found");
         }
+
+        // Fetch related items
+        fetchRelatedItems(mappedCategory.id);
       } else {
-        setError(response.errorMessage || "Failed to load categories");
+        setError(response.errorMessage || "Failed to load category");
       }
     } catch (err) {
       console.error("Error fetching category details:", err);
@@ -283,8 +318,7 @@ export default function CategoryDetailPage({
               item.short_description || item.shortDescription || "",
             longDescription:
               item.long_description || item.longDescription || "",
-            coverImageUrl:
-              item.cover_image_url || item.coverImageUrl || DEFAULT_COVER_IMAGE,
+            coverImageUrl: getImageUrl(item.cover_image_url || item.coverImageUrl) || DEFAULT_COVER_IMAGE,
             backgroundImageUrl:
               item.background_image_url ||
               item.backgroundImageUrl ||
@@ -311,10 +345,10 @@ export default function CategoryDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500 mx-auto mb-4"></div>
-          <span className="text-gray-600">Loading category details...</span>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <div className="text-lg text-gray-600">Loading category details...</div>
         </div>
       </div>
     );
@@ -322,317 +356,276 @@ export default function CategoryDetailPage({
 
   if (error || !category) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Category Not Found
-        </h2>
-        <p className="text-gray-600 mb-4">
-          {error || "The requested category could not be found."}
-        </p>
-        <button
-          onClick={handleBack}
-          className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-        >
-          Back to Categories
-        </button>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12">
+        <div className="text-center">
+          <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-10 h-10 text-red-600" />
+          </div>
+          <div className="text-red-600 text-xl font-semibold mb-2">Error</div>
+          <div className="text-gray-600 mb-6">
+            {error || "The requested category could not be found."}
+          </div>
+          <button
+            onClick={handleBack}
+            className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium"
+          >
+            Back to Categories
+          </button>
+        </div>
       </div>
     );
   }
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {/* Cover Image */}
-        <div className="relative h-64 bg-gradient-to-r from-gray-100 to-gray-200">
-          <img
-            src={category.coverImage}
-            alt={category.categoryName}
-            className="w-full h-full object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-              e.currentTarget.nextElementSibling?.classList.remove("hidden");
-            }}
-          />
-          <div className="absolute inset-0 bg-black bg-opacity-20 hidden flex items-center justify-center">
-            <ImageIcon className="w-16 h-16 text-white opacity-50" />
-          </div>
-
-          {/* Back Button */}
-          <button
-            onClick={handleBack}
-            className="absolute top-4 left-4 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-lg p-2 transition-all duration-200 flex items-center space-x-2"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-700" />
-            <span className="text-gray-700 font-medium">Back</span>
-          </button>
-
-          {/* Category Badge */}
-          <div className="absolute top-4 right-4">
-            <span
-              className={`px-3 py-1 rounded-full text-sm font-medium ${
-                category.isSubCategory
-                  ? "bg-orange-100 text-orange-800"
-                  : "bg-blue-100 text-blue-800"
-              }`}
+    <div className="space-y-6 pb-6">
+      {/* Hero Header */}
+      <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-5"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full -mr-48 -mt-48"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full -ml-32 -mb-32"></div>
+        <div className="relative p-8">
+          <div className="flex items-center justify-between mb-6">
+            <button
+              onClick={handleBack}
+              className="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-opacity-30 transition-all flex items-center space-x-2 font-medium shadow-lg"
             >
-              {category.isSubCategory ? "Sub Category" : "Parent Category"}
-            </span>
+              <ArrowLeft className="w-5 h-5" />
+              <span>Back to Categories</span>
+            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate("/categories/update", { state: { editCategory: category } })}
+                className="bg-white text-blue-600 px-6 py-3 rounded-xl hover:bg-blue-50 transition-all flex items-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Edit className="w-5 h-5" />
+                <span>Edit Category</span>
+              </button>
+              <button
+                onClick={() => handleDelete(category.id)}
+                className="bg-red-500 text-white px-6 py-3 rounded-xl hover:bg-red-600 transition-all flex items-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span>Delete Category</span>
+              </button>
+            </div>
           </div>
-        </div>
+          <div className="flex flex-col md:flex-row items-center md:items-end space-y-6 md:space-y-0 md:space-x-8">
+            {/* Category Image */}
+            <div className="relative group">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-transparent opacity-30 rounded-full blur-xl"></div>
+                <img
+                  src={getImageUrl(category.coverImage)}
+                  alt={category.categoryName}
+                  className="relative w-48 h-48 rounded-full object-cover border-4 border-white shadow-2xl ring-4 ring-white ring-opacity-30 transform transition-transform duration-300 group-hover:scale-105"
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_IMAGE;
+                  }}
+                />
+              </div>
+              <div className="absolute inset-0 -z-10 bg-white opacity-20 rounded-full blur-2xl transform scale-110"></div>
+            </div>
 
-        {/* Category Info */}
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            {/* Category Info */}
+            <div className="text-center md:text-left text-white flex-1">
+              <h1 className="text-4xl font-extrabold mb-2 leading-tight">
                 {category.categoryName}
               </h1>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-white text-opacity-90 text-lg mb-3">
                 {category.shortDescription}
               </p>
-              {category.longDescription && (
-                <p className="text-gray-700 leading-relaxed">
+              <div className="flex items-center justify-center md:justify-start space-x-3 mb-3">
+                <span className={`px-4 py-1 rounded-full text-sm font-medium flex items-center space-x-2 backdrop-blur-sm ${
+                  category.isSubCategory
+                    ? "bg-orange-500 bg-opacity-70 text-white"
+                    : "bg-blue-500 bg-opacity-70 text-white"
+                }`}>
+                  <Tag className="w-4 h-4" />
+                  <span>{category.isSubCategory ? "Sub Category" : "Parent Category"}</span>
+                </span>
+                <span className="bg-white bg-opacity-30 text-white px-4 py-1 rounded-full text-sm font-medium flex items-center space-x-2 backdrop-blur-sm">
+                  <Package className="w-4 h-4" />
+                  <span>{relatedItems.length} Items</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Category Details Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="group relative bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-blue-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <Calendar className="w-6 h-6 text-blue-700" />
+            </div>
+          </div>
+          <p className="text-sm font-semibold text-blue-700 mb-1">Created Date</p>
+          <p className="text-sm font-medium text-blue-700">
+            {formatDate(category.createdAt || "")}
+          </p>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+        </div>
+
+        <div className="group relative bg-gradient-to-br from-green-50 via-green-50 to-green-100 rounded-xl border border-green-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-green-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <Tag className="w-6 h-6 text-green-700" />
+            </div>
+          </div>
+          <p className="text-sm font-semibold text-green-700 mb-1">Category Type</p>
+          <p className="text-sm font-medium text-green-700">
+            {category.isSubCategory ? "Sub Category" : "Parent Category"}
+          </p>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-green-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+        </div>
+
+        <div className="group relative bg-gradient-to-br from-purple-50 via-purple-50 to-purple-100 rounded-xl border border-purple-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-purple-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <Package className="w-6 h-6 text-purple-700" />
+            </div>
+          </div>
+          <p className="text-sm font-semibold text-purple-700 mb-1">Related Items</p>
+          <p className="text-2xl font-bold text-purple-700">
+            {relatedItems.length}
+          </p>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-purple-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+        </div>
+
+        <div className="group relative bg-gradient-to-br from-orange-50 via-orange-50 to-orange-100 rounded-xl border border-orange-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+          <div className="flex items-center justify-between mb-3">
+            <div className="bg-orange-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <FolderOpen className="w-6 h-6 text-orange-700" />
+            </div>
+          </div>
+          <p className="text-sm font-semibold text-orange-700 mb-1">Sub Categories</p>
+          <p className="text-2xl font-bold text-orange-700">
+            {subCategories.length}
+          </p>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-orange-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+        </div>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Description */}
+          {category.longDescription && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <Info className="w-5 h-5 text-gray-600" />
+                  <h3 className="text-lg font-semibold text-gray-800">
+                    Description
+                  </h3>
+                </div>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg border border-gray-200">
                   {category.longDescription}
                 </p>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center space-x-3 ml-6">
-              <button
-                onClick={() => {
-                  //console.log("Edit button clicked for category:", category);
-                  navigate("/categories/update", {
-                    state: { editCategory: category },
-                  });
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
-              >
-                <Edit className="w-4 h-4" />
-                <span>Edit</span>
-              </button>
-              <button
-                onClick={() => {
-                  //console.log("Delete button clicked for category:", category);
-                  handleDelete(category.id);
-                }}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Delete</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Category Details */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Calendar className="w-5 h-5 text-gray-500" />
-                <span className="font-medium text-gray-700">Created Date</span>
-              </div>
-              <span className="text-gray-600">
-                {category.createdAt
-                  ? new Date(category.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })
-                  : "N/A"}
-              </span>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Tag className="w-5 h-5 text-gray-500" />
-                <span className="font-medium text-gray-700">Category Type</span>
-              </div>
-              <span className="text-gray-600">
-                {category.isSubCategory ? "Sub Category" : "Parent Category"}
-              </span>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <Package className="w-5 h-5 text-gray-500" />
-                <span className="font-medium text-gray-700">Related Items</span>
-              </div>
-              <span className="text-gray-600">{relatedItems.length} items</span>
-            </div>
-          </div>
-
-          {/* Parent Categories (for sub-categories) */}
-          {category.isSubCategory && parentCategories.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                Parent Categories
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {parentCategories.map((parent) => (
-                  <div
-                    key={parent.id}
-                    onClick={() => handleViewParentCategory(parent)}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <div className="flex items-center space-x-3 mb-3">
-                      <img
-                        src={parent.coverImage}
-                        alt={parent.categoryName}
-                        className="w-12 h-12 rounded-lg object-cover"
-                        onError={(e) => {
-                          e.currentTarget.src = DEFAULT_IMAGE;
-                        }}
-                      />
-                      <div>
-                        <h4 className="font-medium text-gray-800">
-                          {parent.categoryName}
-                        </h4>
-                        <p className="text-sm text-gray-600">
-                          {parent.shortDescription}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                      Parent Category
-                    </span>
-                  </div>
-                ))}
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Sub Categories Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
-            <FolderOpen className="w-6 h-6 text-gray-600" />
-            <span>
-              {category.isSubCategory
-                ? "Related Sub Categories"
-                : "Sub Categories"}
-            </span>
-          </h2>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-            {subCategories.length} items
-          </span>
-        </div>
-
-        {subCategories.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {subCategories.map((subCategory) => (
-              <div
-                key={subCategory.id}
-                onClick={() => handleViewSubCategory(subCategory)}
-                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-              >
-                <div className="flex items-center space-x-3 mb-3">
-                  <img
-                    src={subCategory.coverImage}
-                    alt={subCategory.categoryName}
-                    className="w-12 h-12 rounded-lg object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_IMAGE;
-                    }}
-                  />
-                  <div>
-                    <h4 className="font-medium text-gray-800">
-                      {subCategory.categoryName}
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      {subCategory.shortDescription}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-block px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
-                    Sub Category
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    Click to view details
-                  </span>
-                </div>
+          {/* Parent Categories (for sub-categories) */}
+          {category.isSubCategory && parentCategories.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Parent Categories
+                </h3>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">
-              {category.isSubCategory
-                ? "No related sub-categories found"
-                : "No sub-categories found"}
-            </p>
-            <p className="text-sm text-gray-500">
-              {category.isSubCategory
-                ? "Sub-categories with the same parent will appear here"
-                : "Sub-categories will appear here when created"}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Show related subcategories for subcategories */}
-      {category.isSubCategory &&
-        parentCategories.length > 0 &&
-        (() => {
-          // Get all subcategories that share the same parent(s) but exclude current category
-          const relatedSubCategories = allCategories.filter(
-            (cat) =>
-              cat.isSubCategory &&
-              cat.id !== category.id &&
-              cat.parentCategoryIds?.some((parentId) =>
-                category.parentCategoryIds?.includes(parentId)
-              )
-          );
-
-          return (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 mt-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
-                  <FolderOpen className="w-6 h-6 text-gray-600" />
-                  <span>Other Sub Categories in Same Parent</span>
-                </h2>
-                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                  {relatedSubCategories.length} items
-                </span>
-              </div>
-
-              {relatedSubCategories.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {relatedSubCategories.map((relatedSubCategory) => (
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {parentCategories.map((parent) => (
                     <div
-                      key={relatedSubCategory.id}
-                      onClick={() => handleViewSubCategory(relatedSubCategory)}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      key={parent.id}
+                      onClick={() => handleViewParentCategory(parent)}
+                      className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-blue-300 transition-all cursor-pointer bg-gray-50 hover:bg-blue-50"
                     >
-                      <div className="flex items-center space-x-3 mb-3">
+                      <div className="flex items-center space-x-3">
                         <img
-                          src={relatedSubCategory.coverImage}
-                          alt={relatedSubCategory.categoryName}
-                          className="w-12 h-12 rounded-lg object-cover"
+                          src={getImageUrl(parent.coverImage)}
+                          alt={parent.categoryName}
+                          className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
                           onError={(e) => {
                             e.currentTarget.src = DEFAULT_IMAGE;
                           }}
                         />
-                        <div>
-                          <h4 className="font-medium text-gray-800">
-                            {relatedSubCategory.categoryName}
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-800 mb-1">
+                            {parent.categoryName}
                           </h4>
-                          <p className="text-sm text-gray-600">
-                            {relatedSubCategory.shortDescription}
+                          <p className="text-sm text-gray-600 line-clamp-2">
+                            {parent.shortDescription}
                           </p>
+                          <span className="inline-block mt-2 px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-lg border border-blue-200">
+                            Parent Category
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                          Related Sub Category
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          Click to view details
-                        </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sub Categories Section */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  {category.isSubCategory ? "Related Sub Categories" : "Sub Categories"}
+                </h3>
+                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                  {subCategories.length} items
+                </span>
+              </div>
+            </div>
+            <div className="p-6">
+              {subCategories.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {subCategories.map((subCategory) => (
+                    <div
+                      key={subCategory.id}
+                      onClick={() => handleViewSubCategory(subCategory)}
+                      className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-orange-300 transition-all cursor-pointer bg-gray-50 hover:bg-orange-50"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <img
+                          src={getImageUrl(subCategory.coverImage)}
+                          alt={subCategory.categoryName}
+                          className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_IMAGE;
+                          }}
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-800 mb-1">
+                            {subCategory.categoryName}
+                          </h4>
+                          <p className="text-sm text-gray-600 line-clamp-2">
+                            {subCategory.shortDescription}
+                          </p>
+                          <span className="inline-block mt-2 px-2.5 py-1 bg-orange-100 text-orange-800 text-xs font-semibold rounded-lg border border-orange-200">
+                            Sub Category
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -641,142 +634,192 @@ export default function CategoryDetailPage({
                 <div className="text-center py-8">
                   <FolderOpen className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-600">
-                    No related sub-categories found
+                    {category.isSubCategory
+                      ? "No related sub-categories found"
+                      : "No sub-categories found"}
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Other sub-categories with the same parent will appear here
+                  <p className="text-sm text-gray-500 mt-1">
+                    {category.isSubCategory
+                      ? "Sub-categories with the same parent will appear here"
+                      : "Sub-categories will appear here when created"}
                   </p>
                 </div>
               )}
             </div>
-          );
-        })()}
-
-      {/* Related Items Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
-            <Package className="w-6 h-6 text-gray-600" />
-            <span>Related Items</span>
-          </h2>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-            {relatedItems.length} items
-          </span>
-        </div>
-
-        {relatedItems.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {relatedItems.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleViewItem(item.id)}
-                className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-              >
-                <img
-                  src={item.coverImageUrl}
-                  alt={item.itemName}
-                  className="w-full h-48 object-cover"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_IMAGE;
-                  }}
-                />
-                <div className="p-4">
-                  <h4 className="font-medium text-gray-800 mb-2 line-clamp-2">
-                    {item.itemName}
-                  </h4>
-                  <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                    {item.shortDescription}
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">
-                      {item.createdAt
-                        ? new Date(item.createdAt).toLocaleDateString()
-                        : ""}
-                    </span>
-                    <span className="text-xs text-blue-600 font-medium">
-                      View Details
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">No items found in this category</p>
-            <p className="text-sm text-gray-500">
-              Items assigned to this category will appear here
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* Products Section */}
-      {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 flex items-center space-x-2">
-            <Package className="w-6 h-6 text-gray-600" />
-            <span>Products in this Category</span>
-          </h2>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-            {products.length} items
-          </span>
-        </div>
+          {/* Show related subcategories for subcategories */}
+          {category.isSubCategory &&
+            parentCategories.length > 0 &&
+            (() => {
+              // Get all subcategories that share the same parent(s) but exclude current category
+              const relatedSubCategories = allCategories.filter(
+                (cat) =>
+                  cat.isSubCategory &&
+                  cat.id !== category.id &&
+                  cat.parentCategoryIds?.some((parentId) =>
+                    category.parentCategoryIds?.includes(parentId)
+                  )
+              );
 
-        {products.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <div
-                key={product.id}
-                className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                <img
-                  src={product.image}
-                  alt={product.name}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-gray-800 line-clamp-2">
-                      {product.name}
-                    </h4>
-                    <span className="text-lg font-bold text-red-600">
-                      ${product.price}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-yellow-400">★</span>
-                      <span className="text-sm text-gray-600">
-                        {product.rating}
+              return relatedSubCategories.length > 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+                  <div className="p-6 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Other Sub Categories in Same Parent
+                      </h3>
+                      <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                        {relatedSubCategories.length} items
                       </span>
                     </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        product.inStock
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {product.inStock ? "In Stock" : "Out of Stock"}
-                    </span>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {relatedSubCategories.map((relatedSubCategory) => (
+                        <div
+                          key={relatedSubCategory.id}
+                          onClick={() => handleViewSubCategory(relatedSubCategory)}
+                          className="border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-purple-300 transition-all cursor-pointer bg-gray-50 hover:bg-purple-50"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <img
+                              src={getImageUrl(relatedSubCategory.coverImage)}
+                              alt={relatedSubCategory.categoryName}
+                              className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
+                              onError={(e) => {
+                                e.currentTarget.src = DEFAULT_IMAGE;
+                              }}
+                            />
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-800 mb-1">
+                                {relatedSubCategory.categoryName}
+                              </h4>
+                              <p className="text-sm text-gray-600 line-clamp-2">
+                                {relatedSubCategory.shortDescription}
+                              </p>
+                              <span className="inline-block mt-2 px-2.5 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-lg border border-purple-200">
+                                Related Sub Category
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
+              ) : null;
+            })()}
+
+          {/* Related Items Section */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Related Items
+                </h3>
+                <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                  {relatedItems.length} items
+                </span>
               </div>
-            ))}
+            </div>
+            <div className="p-6">
+              {relatedItems.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {relatedItems.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleViewItem(item.id)}
+                      className="border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-red-300 transition-all cursor-pointer bg-white group"
+                    >
+                      <div className="relative">
+                        <img
+                          src={getImageUrl(item.coverImageUrl)}
+                          alt={item.itemName}
+                          className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_IMAGE;
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 bg-white bg-opacity-90 px-2 py-1 rounded-lg">
+                          <span className="text-xs font-semibold text-gray-700">View</span>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <h4 className="font-semibold text-gray-800 mb-2 line-clamp-2 group-hover:text-red-600 transition-colors">
+                          {item.itemName}
+                        </h4>
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-3">
+                          {item.shortDescription}
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>
+                            {item.createdAt
+                              ? new Date(item.createdAt).toLocaleDateString()
+                              : ""}
+                          </span>
+                          <span className="text-blue-600 font-medium">
+                            View Details →
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">No items found in this category</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Items assigned to this category will appear here
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-8">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <p className="text-gray-600">No products found in this category</p>
-            <p className="text-sm text-gray-500">
-              Products will appear here when added to this category
-            </p>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Category Information */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800">
+                Category Information
+              </h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Tag className="w-4 h-4 text-gray-500" />
+                  <p className="font-semibold text-gray-800">Category ID</p>
+                </div>
+                <p className="text-sm text-gray-700 font-mono">{category.id}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <p className="font-semibold text-gray-800">Created Date</p>
+                </div>
+                <p className="text-sm text-gray-700">
+                  {formatDate(category.createdAt || "")}
+                </p>
+              </div>
+              {category.updatedAt && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <p className="font-semibold text-gray-800">Last Updated</p>
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    {formatDate(category.updatedAt)}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div> */}
+        </div>
+      </div>
     </div>
   );
 }

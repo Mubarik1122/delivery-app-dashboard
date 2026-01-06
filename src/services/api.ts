@@ -86,10 +86,17 @@ export interface User {
   role_name: string;
   description?: string;
   restaurant_name?: string;
+  restaurant_image?: string;
   agreement_docs?: string;
+  certificate_doc?: string;
+  driver_licence_doc?: string;
   created_at?: string;
   updated_at?: string;
   is_active?: boolean;
+  latitude?: number;
+  longitude?: number;
+  is_food?: boolean;
+  is_grocery?: boolean;
 }
 
 export interface CreateUserRequest {
@@ -105,8 +112,13 @@ export interface CreateUserRequest {
   zip_code: string;
   description?: string;
   restaurant_name?: string;
+  restaurant_image?: string;
   agreement_docs?: string;
   password: string;
+  latitude?: number;
+  longitude?: number;
+  is_food?: boolean;
+  is_grocery?: boolean;
 }
 
 export interface UpdateUserRequest extends Partial<CreateUserRequest> {
@@ -180,6 +192,11 @@ export interface UpdateCategoryRequest extends CreateUpdateCategoryRequest {
 }
 
 // Item Interfaces
+export interface ItemSize {
+  sizeName: string;
+  price: number;
+}
+
 export interface Item {
   id: number;
   itemName: string;
@@ -188,6 +205,8 @@ export interface Item {
   backgroundImageUrl: string;
   coverImageUrl: string;
   categoryIds: number[];
+  addonIds?: number[];
+  sizes?: ItemSize[];
   quantity?: number;
   price?: number;
   createdAt?: string;
@@ -203,6 +222,8 @@ export interface CreateUpdateItemRequest {
   backgroundImageUrl: string;
   coverImageUrl: string;
   categoryIds: number[];
+  addonIds?: number[];
+  sizes?: ItemSize[];
   quantity?: number;
   price?: number;
 }
@@ -219,11 +240,46 @@ export interface ItemsResponse {
 export interface ItemResponse {
   errorCode: number;
   errorMessage: string | null;
-  data: Item | null;
+  data: {
+    items: Item[];
+    message?: string;
+  } | Item | null;
 }
 
 export interface UpdateItemRequest extends CreateUpdateItemRequest {
   id: number;
+}
+
+// Addon Interfaces
+export interface Addon {
+  id: number;
+  addonName: string;
+  description: string;
+  price: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  userId?: number;
+}
+
+export interface CreateAddonRequest {
+  id?: number;
+  addonName: string;
+  description: string;
+  price: number;
+  isActive: boolean;
+}
+
+export interface AddonsResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: Addon[] | null;
+}
+
+export interface AddonResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: Addon | null;
 }
 
 // Cart Interfaces
@@ -390,6 +446,19 @@ class ApiService {
 
       // Log requests in development
       if (import.meta.env.DEV) {
+        // Log request body for signup to verify image is included
+        if (endpoint.includes('/signup') && options.body) {
+          try {
+            const bodyData = JSON.parse(options.body as string);
+            console.log('Signup request payload:', {
+              hasRestaurantImage: !!bodyData.restaurant_image,
+              imageLength: bodyData.restaurant_image?.length || 0,
+              imagePreview: bodyData.restaurant_image?.substring(0, 100) || 'N/A'
+            });
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }
         // console.log(`API ${options.method} ${endpoint}:`, {
         //   status: response.status,
         //   response: responseData
@@ -498,14 +567,34 @@ class ApiService {
   }
 
   // User Methods
-  async getUsers(): Promise<UsersResponse> {
-    return this.makeRequest<UsersResponse>('/auth/getUsers', {
+  async getUsers(role?: string, userId?: number): Promise<UsersResponse> {
+    let endpoint = '/auth/getUsers';
+    const params: string[] = [];
+    
+    if (role) {
+      params.push(`role=${role}`);
+    }
+    if (userId) {
+      params.push(`user_id=${userId}`);
+    }
+    
+    if (params.length > 0) {
+      endpoint += `?${params.join('&')}`;
+    }
+    
+    return this.makeRequest<UsersResponse>(endpoint, {
       method: 'GET',
     });
   }
 
   async getCurrentUser(): Promise<CurrentUserResponse> {
     return this.makeRequest<CurrentUserResponse>('/auth/me', {
+      method: 'GET',
+    });
+  }
+
+  async getProfileData(): Promise<UsersResponse> {
+    return this.makeRequest<UsersResponse>('/auth/getProfileData', {
       method: 'GET',
     });
   }
@@ -540,7 +629,7 @@ class ApiService {
 
   async deleteUser(userId: number): Promise<{ success: boolean; message: string }> {
     return this.makeRequest<{ success: boolean; message: string }>(
-      `/auth/deleteUser/${userId}`,
+      `/user/delete/${userId}`,
       {
         method: 'DELETE',
       }
@@ -625,7 +714,7 @@ class ApiService {
   }
 
   async getItemById(id: number): Promise<ItemResponse> {
-    return this.makeRequest<ItemResponse>(`/item/getAllItems/${id}`, {
+    return this.makeRequest<ItemResponse>(`/item/getAllItems?id=${id}`, {
       method: 'GET',
     });
   }
@@ -648,6 +737,51 @@ class ApiService {
         method: 'DELETE',
       }
     );
+  }
+
+  // Addon Methods
+  async getAllAddons(): Promise<AddonsResponse> {
+    return this.makeRequest<AddonsResponse>('/addon/getAll', {
+      method: 'GET',
+    });
+  }
+
+  async getAddonById(id: number): Promise<AddonResponse> {
+    return this.makeRequest<AddonResponse>(`/addon/getById/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createAddon(data: CreateAddonRequest): Promise<AddonResponse> {
+    return this.makeRequest<AddonResponse>('/addon/createOrUpdate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAddon(id: number): Promise<{ success: boolean; message: string }> {
+    const response = await this.makeRequest<{ 
+      errorCode: number; 
+      errorMessage: string | null; 
+      data: { message: string; addon?: any } | null 
+    }>(
+      `/addon/delete/${id}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    if (response.errorCode === 0) {
+      return {
+        success: true,
+        message: response.data?.message || 'Addon deleted successfully'
+      };
+    }
+
+    return {
+      success: false,
+      message: response.errorMessage || 'Failed to delete addon'
+    };
   }
 
   // Cart Methods
@@ -728,6 +862,19 @@ class ApiService {
     });
   }
 
+  async getOrder(orderId: string): Promise<{ errorCode: number; errorMessage: string | null; data: any }> {
+    return this.makeRequest<{ errorCode: number; errorMessage: string | null; data: any }>(`/order/${orderId}`, {
+      method: 'GET',
+    });
+  }
+
+  async updateOrderStatus(orderId: string, orderStatus: string): Promise<{ errorCode: number; errorMessage: string | null; data: any }> {
+    return this.makeRequest<{ errorCode: number; errorMessage: string | null; data: any }>(`/order/update-status/${orderId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ order_status: orderStatus }),
+    });
+  }
+
   // Upload Methods
   async uploadImage(file: File): Promise<UploadImageResponse> {
     const formData = new FormData();
@@ -739,7 +886,7 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/upload/image`, {
+    const response = await fetch(`${this.base}/upload/image`, {
       method: 'POST',
       headers,
       body: formData,

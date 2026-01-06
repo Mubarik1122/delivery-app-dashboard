@@ -99,6 +99,29 @@ export default function CategoriesPage() {
   // Default demo image
   const DEFAULT_IMAGE =
     "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
+
+  // Image base URL from environment variable (only for images, not for API calls)
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return DEFAULT_IMAGE;
+    
+    // Trim the path to remove any leading/trailing spaces
+    const trimmedPath = imagePath.trim();
+    
+    // If already a full URL (starts with http:// or https://), return as is
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    
+    // Remove leading slash if present
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    
+    // Join base URL and path without double slashes
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
   const loadCategories = async () => {
     try {
       setLoading(true);
@@ -115,7 +138,7 @@ export default function CategoriesPage() {
           shortDescription: cat.short_description,
           longDescription: cat.long_description,
           isSubCategory: cat.is_sub_category,
-          coverImage: cat.cover_image || DEFAULT_IMAGE,
+          coverImage: getImageUrl(cat.cover_image),
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
@@ -277,8 +300,8 @@ export default function CategoriesPage() {
       <div key={category.id}>
         {/* Category Row */}
         <div
-          className={`hover:bg-gray-50 transition-colors ${
-            level > 0 ? "bg-gray-25" : ""
+          className={`hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-200 group ${
+            level > 0 ? "bg-gray-50" : ""
           }`}
         >
           <div
@@ -306,10 +329,10 @@ export default function CategoriesPage() {
                 <div
                   className={`${
                     level > 0 ? "w-10 h-10" : "w-12 h-12"
-                  } rounded-lg overflow-hidden border border-gray-200 bg-gray-50 flex items-center justify-center`}
+                  } rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-50 flex items-center justify-center group-hover:border-red-300 transition-all shadow-sm group-hover:shadow-md`}
                 >
                   <img
-                    src={category.coverImage}
+                    src={getImageUrl(category.coverImage)}
                     alt={category.categoryName}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -323,15 +346,15 @@ export default function CategoriesPage() {
                 </div>
                 <div>
                   <h4
-                    className={`font-semibold text-gray-800 ${
-                      level > 0 ? "text-sm" : ""
+                    className={`font-semibold text-gray-800 group-hover:text-red-600 transition-colors ${
+                      level > 0 ? "text-sm" : "text-base"
                     }`}
                   >
                     {"".repeat(level)}
                     {category.categoryName}
                   </h4>
                   {hasChildren && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 font-medium">
                       {category.children.length} sub-categories
                     </span>
                   )}
@@ -356,12 +379,12 @@ export default function CategoriesPage() {
 
             <div className="col-span-2">
               <span
-                className={`px-3 py-1 text-xs font-medium rounded-full ${
+                className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg border ${
                   !category.isSubCategory
-                    ? "bg-blue-100 text-blue-800"
+                    ? "bg-blue-50 text-blue-800 border-blue-200"
                     : level === 0
-                    ? "bg-orange-100 text-orange-800"
-                    : "bg-purple-100 text-purple-800"
+                    ? "bg-orange-50 text-orange-800 border-orange-200"
+                    : "bg-purple-50 text-purple-800 border-purple-200"
                 }`}
               >
                 {!category.isSubCategory ? "Parent" : `Sub-Level ${level + 1}`}
@@ -369,24 +392,24 @@ export default function CategoriesPage() {
             </div>
 
             <div className="col-span-2">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1">
                 <button
                   onClick={() => handleViewCategory(category)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all border border-transparent hover:border-blue-200"
                   title="View Details"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleEditCategory(category)}
-                  className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-all border border-transparent hover:border-green-200"
                   title="Edit Category"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteCategory(category.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all border border-transparent hover:border-red-200"
                   title="Delete Category"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -654,11 +677,14 @@ export default function CategoriesPage() {
 
   if (showAddForm) {
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+      <div className="space-y-6 pb-6">
+        {/* Hero Header */}
+        <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="absolute inset-0 bg-black opacity-5"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full -mr-48 -mt-48"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full -ml-32 -mb-32"></div>
+          <div className="relative p-8">
+            <div className="flex items-center justify-between mb-6">
               <button
                 type="button"
                 onClick={() => {
@@ -666,39 +692,46 @@ export default function CategoriesPage() {
                   resetForm();
                   navigate("/categories", { replace: true });
                 }}
-                className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-opacity-30 transition-all flex items-center space-x-2 font-medium shadow-lg"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span>Back to Categories</span>
               </button>
             </div>
-          </div>
-          <div className="mt-4">
-            <h1 className="text-2xl font-bold text-gray-800">
-              {editingCategory ? "Edit Category" : "Add New Category"}
-            </h1>
-            <p className="text-gray-600">
-              {editingCategory
-                ? "Update category information"
-                : "Create a new category for your products"}
-            </p>
+            <div className="flex items-center space-x-4">
+              <div className="bg-white bg-opacity-20 backdrop-blur-sm p-4 rounded-xl">
+                <FolderOpen className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-bold text-white mb-2">
+                  {editingCategory ? "Edit Category" : "Add New Category"}
+                </h1>
+                <p className="text-white text-opacity-90 text-lg">
+                  {editingCategory
+                    ? "Update category information and details"
+                    : "Create a new category for your products"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Form */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
-              {error}
+            <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-300 text-red-800 px-6 py-4 rounded-xl text-sm mb-6 flex items-center space-x-2">
+              <span className="font-medium">{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Category Type Selection */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Category Type
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Category Type
+                </h3>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
@@ -706,43 +739,45 @@ export default function CategoriesPage() {
                     handleInputChange("isSubCategory", false);
                     handleInputChange("parentCategoryIds", []);
                   }}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-6 rounded-lg border transition-all ${
                     !formData.isSubCategory
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                      ? "border-blue-500 bg-blue-50 text-blue-700 shadow-md"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
                   }`}
                   disabled={isSubmitting}
                 >
                   <Folder className="w-8 h-8 mx-auto mb-2" />
-                  <div className="font-semibold">Parent Category</div>
-                  <div className="text-sm">Main category</div>
+                  <div className="font-semibold text-base">Parent Category</div>
+                  <div className="text-sm text-gray-600">Main category</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleInputChange("isSubCategory", true)}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-6 rounded-lg border transition-all ${
                     formData.isSubCategory
-                      ? "border-orange-500 bg-orange-50 text-orange-700"
-                      : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                      ? "border-orange-500 bg-orange-50 text-orange-700 shadow-md"
+                      : "border-gray-300 bg-white text-gray-700 hover:border-orange-400 hover:bg-orange-50"
                   }`}
                   disabled={isSubmitting}
                 >
                   <FolderOpen className="w-8 h-8 mx-auto mb-2" />
-                  <div className="font-semibold">Sub Category</div>
-                  <div className="text-sm">Under parent</div>
+                  <div className="font-semibold text-base">Sub Category</div>
+                  <div className="text-sm text-gray-600">Under parent</div>
                 </button>
               </div>
             </div>
 
             {/* Category Information */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Category Information
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Category Information
+                </h3>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category Name *
+                    Category Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -750,7 +785,7 @@ export default function CategoriesPage() {
                     onChange={(e) =>
                       handleInputChange("categoryName", e.target.value)
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white"
                     placeholder="Enter category name"
                     required
                     disabled={isSubmitting}
@@ -759,7 +794,7 @@ export default function CategoriesPage() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Short Description *
+                    Short Description <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -767,7 +802,7 @@ export default function CategoriesPage() {
                     onChange={(e) =>
                       handleInputChange("shortDescription", e.target.value)
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white"
                     placeholder="Enter short description (max 100 characters)"
                     maxLength={100}
                     required
@@ -785,7 +820,7 @@ export default function CategoriesPage() {
                       handleInputChange("longDescription", e.target.value)
                     }
                     rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white resize-none"
                     placeholder="Enter detailed description of the category"
                     disabled={isSubmitting}
                   />
@@ -795,7 +830,7 @@ export default function CategoriesPage() {
                 {formData.isSubCategory && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Parent Categories *
+                      Select Parent Categories <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       {/* Trigger */}
@@ -803,7 +838,7 @@ export default function CategoriesPage() {
                         onClick={() =>
                           setShowCategoryDropdown(!showCategoryDropdown)
                         }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 cursor-pointer bg-white min-h-[48px] flex items-center justify-between"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer bg-white min-h-[42px] flex items-center justify-between hover:border-gray-400 transition-all"
                       >
                         <div className="flex-1">
                           {formData.parentCategoryIds.length === 0 ? (
@@ -824,7 +859,7 @@ export default function CategoriesPage() {
                                       className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs"
                                     >
                                       <img
-                                        src={category.coverImage}
+                                        src={getImageUrl(category.coverImage)}
                                         alt={category.categoryName}
                                         className="w-4 h-4 rounded-full object-cover"
                                       />
@@ -879,7 +914,7 @@ export default function CategoriesPage() {
                                     className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                                   />
                                   <img
-                                    src={category.coverImage}
+                                    src={getImageUrl(category.coverImage)}
                                     alt={category.categoryName}
                                     className="w-8 h-8 rounded-lg object-cover border border-gray-200"
                                   />
@@ -903,14 +938,16 @@ export default function CategoriesPage() {
             </div>
 
             {/* Image Upload */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                Cover Image
-              </h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Cover Image
+                </h3>
+              </div>
 
               {/* Image Upload Method Selection */}
               <div className="mb-4">
-                <div className="flex space-x-4">
+                <div className="flex space-x-3">
                   <button
                     type="button"
                     onClick={() => {
@@ -918,10 +955,10 @@ export default function CategoriesPage() {
                       setSelectedFile(null);
                       setImagePreview("");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       imageUploadMethod === "url"
                         ? "border-blue-500 bg-blue-50 text-blue-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -934,10 +971,10 @@ export default function CategoriesPage() {
                       setImageUploadMethod("upload");
                       handleInputChange("coverImage", "");
                     }}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all text-sm font-medium ${
                       imageUploadMethod === "upload"
                         ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50"
                     }`}
                     disabled={isSubmitting}
                   >
@@ -959,8 +996,8 @@ export default function CategoriesPage() {
                       handleInputChange("coverImage", e.target.value);
                       setImagePreview(e.target.value);
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter image URL or leave empty for default"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all bg-white"
+                    placeholder="https://example.com/image.jpg"
                     disabled={isSubmitting}
                   />
                 </div>
@@ -972,9 +1009,9 @@ export default function CategoriesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload Image
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-all bg-gray-50">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-gray-700 mb-1">
                       {selectedFile
                         ? selectedFile.name
                         : "Click to upload or drag and drop"}
@@ -995,7 +1032,7 @@ export default function CategoriesPage() {
                       onClick={() =>
                         document.getElementById("image-upload")?.click()
                       }
-                      className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all text-sm font-medium flex items-center space-x-2 mx-auto"
                       disabled={isSubmitting}
                     >
                       <ImageIcon className="w-4 h-4" />
@@ -1011,30 +1048,20 @@ export default function CategoriesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Preview
                   </label>
-                  <div className="flex items-center space-x-4">
-                    <img
-                      src={imagePreview || formData.coverImage || DEFAULT_IMAGE}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg border border-gray-200"
-                      onError={(e) => {
-                        e.currentTarget.src = DEFAULT_IMAGE;
-                      }}
-                    />
-                    <div className="text-sm text-gray-600">
-                      <p>This is how your category image will appear</p>
-                      {!imagePreview && !formData.coverImage && (
-                        <p className="text-gray-500 mt-1">
-                          Default image will be used if no image is provided
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  <img
+                    src={getImageUrl(imagePreview || formData.coverImage)}
+                    alt="Preview"
+                    className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_IMAGE;
+                    }}
+                  />
                 </div>
               )}
             </div>
 
             {/* Submit Buttons */}
-            <div className="flex items-center justify-end space-x-4">
+            <div className="flex items-center justify-end space-x-3 pt-6 border-t border-gray-200">
               <button
                 type="button"
                 onClick={() => {
@@ -1042,14 +1069,14 @@ export default function CategoriesPage() {
                   resetForm();
                   navigate("/categories", { replace: true });
                 }}
-                className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                className="bg-white text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-50 transition-all font-medium border border-gray-300 hover:border-gray-400"
                 disabled={isSubmitting}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-6 py-3 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                className="bg-red-500 text-white px-6 py-2.5 rounded-lg hover:bg-red-600 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
@@ -1074,36 +1101,48 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-bold text-gray-800 mb-2">
-              📁 Categories Management
-            </h1>
-            <p className="text-gray-600">
-              Organize your products with categories and subcategories
-            </p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-              <span>Refresh</span>
-            </button>
-            <button
-              onClick={handleAddCategory}
-              className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add Category</span>
-            </button>
+    <div className="space-y-6 pb-6">
+      {/* Hero Header */}
+      <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-5"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full -mr-48 -mt-48"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full -ml-32 -mb-32"></div>
+        <div className="relative p-8">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm p-3 rounded-xl">
+                  <FolderOpen className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl lg:text-4xl font-bold text-white mb-1">
+                    Categories Management
+                  </h1>
+                  <p className="text-white text-opacity-90 text-lg">
+                    Organize your products with categories and subcategories
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleRefresh}
+                disabled={loading}
+                className="bg-white bg-opacity-20 backdrop-blur-sm text-white px-4 py-2 rounded-xl hover:bg-opacity-30 transition-all flex items-center space-x-2 font-medium shadow-lg"
+              >
+                <RefreshCw
+                  className={`w-5 h-5 ${loading ? "animate-spin" : ""}`}
+                />
+                <span>Refresh</span>
+              </button>
+              <button
+                onClick={handleAddCategory}
+                className="bg-white text-red-600 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all flex items-center space-x-2 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Category</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1117,51 +1156,54 @@ export default function CategoriesPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="group relative bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-3xl font-bold text-blue-700 mb-1">
                 {totalCategories}
               </p>
-              <p className="text-sm text-blue-700">Total Categories</p>
+              <p className="text-sm font-medium text-blue-600">Total Categories</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <FolderOpen className="w-6 h-6 text-blue-600" />
+            <div className="bg-blue-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <FolderOpen className="w-6 h-6 text-blue-700" />
             </div>
           </div>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-blue-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
         </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+        <div className="group relative bg-gradient-to-br from-green-50 via-green-50 to-green-100 rounded-xl border border-green-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-3xl font-bold text-green-700 mb-1">
                 {parentCategoriesCount}
               </p>
-              <p className="text-sm text-green-700">Parent Categories</p>
+              <p className="text-sm font-medium text-green-600">Parent Categories</p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Folder className="w-6 h-6 text-green-600" />
+            <div className="bg-green-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <Folder className="w-6 h-6 text-green-700" />
             </div>
           </div>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-green-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
         </div>
 
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6">
+        <div className="group relative bg-gradient-to-br from-orange-50 via-orange-50 to-orange-100 rounded-xl border border-orange-200 p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-3xl font-bold text-orange-700 mb-1">
                 {subCategoriesCount}
               </p>
-              <p className="text-sm text-orange-700">Sub Categories</p>
+              <p className="text-sm font-medium text-orange-600">Sub Categories</p>
             </div>
-            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-              <FolderOpen className="w-6 h-6 text-orange-600" />
+            <div className="bg-orange-200 p-3 rounded-xl group-hover:scale-110 transition-transform">
+              <FolderOpen className="w-6 h-6 text-orange-700" />
             </div>
           </div>
+          <div className="absolute top-0 right-0 w-16 h-16 bg-orange-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
         </div>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -1171,7 +1213,7 @@ export default function CategoriesPage() {
                 placeholder="Search categories by name or description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
               />
             </div>
           </div>
@@ -1182,7 +1224,7 @@ export default function CategoriesPage() {
               onChange={(e) =>
                 setFilterType(e.target.value as "all" | "parent" | "sub")
               }
-              className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="border border-gray-300 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
             >
               <option value="all">All Categories</option>
               <option value="parent">Parent Only</option>
@@ -1207,13 +1249,13 @@ export default function CategoriesPage() {
 
       {/* Categories Table Accordion */}
       {!loading && categories.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">
                 Categories
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 font-medium">
                 Showing {filteredCount} of {categories.length} categories
               </p>
             </div>
@@ -1221,7 +1263,7 @@ export default function CategoriesPage() {
 
           {/* Table Header */}
           <div className="bg-gray-50 border-b border-gray-200">
-            <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
               <div className="col-span-1"></div>
               <div className="col-span-4">Category Name</div>
               <div className="col-span-3">Description</div>
@@ -1245,9 +1287,11 @@ export default function CategoriesPage() {
 
       {/* Empty State */}
       {!loading && categories.length === 0 && !error && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-medium text-gray-800 mb-2">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <div className="bg-red-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FolderOpen className="w-10 h-10 text-red-600" />
+          </div>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">
             No Categories Found
           </h3>
           <p className="text-gray-600 mb-6">
@@ -1256,7 +1300,7 @@ export default function CategoriesPage() {
           </p>
           <button
             onClick={handleAddCategory}
-            className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2 mx-auto"
+            className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-lg hover:from-red-600 hover:to-red-700 transition-all flex items-center space-x-2 mx-auto shadow-md hover:shadow-lg"
           >
             <Plus className="w-5 h-5" />
             <span>Add Your First Category</span>
@@ -1268,9 +1312,11 @@ export default function CategoriesPage() {
       {!loading &&
         categories.length > 0 &&
         filteredCategoryTree.length === 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-            <Search className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-medium text-gray-800 mb-2">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+            <div className="bg-gray-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-10 h-10 text-gray-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
               No Categories Match Your Search
             </h3>
             <p className="text-gray-600 mb-6">
@@ -1279,10 +1325,10 @@ export default function CategoriesPage() {
             </p>
             <button
               onClick={() => {
-                setShowAddForm(false);
+                setSearchTerm("");
                 setFilterType("all");
               }}
-              className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              className="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-200 transition-colors font-medium"
             >
               Clear Search
             </button>
