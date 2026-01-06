@@ -39,6 +39,7 @@ import CategoriesPage from "./components/CategoriesPage";
 import CategoryDetailPage from "./components/CategoryDetailPage";
 import ItemsPage from "./components/ItemsPage";
 import ItemDetailPage from "./components/ItemDetailPage";
+import AddonsPage from "./components/AddonsPage";
 import {
   Clock,
   CheckCircle,
@@ -49,6 +50,14 @@ import {
   AlertTriangle,
   Gift,
   Bell,
+  Users,
+  DollarSign,
+  TrendingUp,
+  Activity,
+  Search,
+  Store,
+  Loader2,
+  PackageCheck,
 } from "lucide-react";
 import DeleteConfirmationPage from "./components/DeleteConfirmationPage";
 import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
@@ -212,6 +221,7 @@ function App() {
             <Route path="/items/new" element={<ItemsPage />} />
             <Route path="/items/update" element={<ItemsPage />} />
             <Route path="/items/:id" element={<ItemDetailPage />} />
+            <Route path="/addons" element={<AddonsPage />} />
             <Route path="/categories/new" element={<CategoriesPage />} />
             <Route path="/categories/update" element={<CategoriesPage />} />
             <Route
@@ -318,18 +328,38 @@ function App() {
 // Dashboard content component
 function DashboardContent() {
   const [loading, setLoading] = React.useState(true);
-  const [stats, setStats] = React.useState({
-    pending: 0,
-    confirmed: 0,
-    processing: 0,
-    outForDelivery: 0,
-    delivered: 0,
-    cancelled: 0,
-    returned: 0,
-    failed: 0,
-  });
-  const [orders, setOrders] = React.useState<any[]>([]);
-  const [items, setItems] = React.useState<any[]>([]);
+  const [vendors, setVendors] = React.useState<any[]>([]);
+  const [vendorStats, setVendorStats] = React.useState<{
+    [vendorId: number]: {
+      vendorName: string;
+      pending: number;
+      confirmed: number;
+      processing: number;
+      outForDelivery: number;
+      delivered: number;
+      cancelled: number;
+      totalAmount: number;
+      vendorCommission: number;
+      adminCommission: number;
+    };
+  }>({});
+  const [adminCommissionPercentage] = React.useState(10); // Admin gets 10% commission
+  const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Get current month date range
+  const getStartOfMonth = (): string => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth(), 1)
+      .toISOString()
+      .split("T")[0];
+  };
+
+  const getEndOfMonth = (): string => {
+    const date = new Date();
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+      .toISOString()
+      .split("T")[0];
+  };
 
   // Fetch dashboard data
   React.useEffect(() => {
@@ -340,11 +370,20 @@ function DashboardContent() {
         // Create apiService instance
         const { apiService } = await import('./services/api');
 
-        // Fetch orders and items
-        const [ordersResponse, itemsResponse] = await Promise.all([
-          apiService.getAllOrders({ page: 1, limit: 1000 }),
-          apiService.getAllItems(),
+        // Fetch vendors and orders for current month
+        const [vendorsResponse, ordersResponse] = await Promise.all([
+          apiService.getUsers('Vendor'),
+          apiService.getAllOrders({
+            start_date: getStartOfMonth(),
+            end_date: getEndOfMonth(),
+            page: 1,
+            limit: 10000,
+          }),
         ]);
+
+        // Process vendors
+        const allVendors = vendorsResponse.data?.users || vendorsResponse.data || [];
+        setVendors(allVendors);
 
         // Process orders
         let allOrders: any[] = [];
@@ -354,24 +393,70 @@ function DashboardContent() {
           allOrders = ordersResponse.data.orders;
         }
 
-        // Process items
-        const allItems = itemsResponse.data?.items || [];
+        // Calculate stats for each vendor
+        const statsByVendor: {
+          [vendorId: number]: {
+            vendorName: string;
+            pending: number;
+            confirmed: number;
+            processing: number;
+            outForDelivery: number;
+            delivered: number;
+            cancelled: number;
+            totalAmount: number;
+            vendorCommission: number;
+            adminCommission: number;
+          };
+        } = {};
 
-        // Calculate stats from orders
-        const newStats = {
-          pending: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'pending').length,
-          confirmed: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'confirmed').length,
-          processing: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'processing').length,
-          outForDelivery: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'out-for-delivery').length,
-          delivered: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'delivered').length,
-          cancelled: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'cancelled').length,
-          returned: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'returned').length,
-          failed: allOrders.filter((o: any) => o.order_status?.toLowerCase() === 'failed').length,
-        };
+        // Initialize stats for each vendor
+        allVendors.forEach((vendor: any) => {
+          const vendorId = vendor.id || vendor.user_id;
+          statsByVendor[vendorId] = {
+            vendorName: vendor.restaurant_name || `${vendor.first_name} ${vendor.last_name}` || 'Unknown Vendor',
+            pending: 0,
+            confirmed: 0,
+            processing: 0,
+            outForDelivery: 0,
+            delivered: 0,
+            cancelled: 0,
+            totalAmount: 0,
+            vendorCommission: 0,
+            adminCommission: 0,
+          };
+        });
 
-        setStats(newStats);
-        setOrders(allOrders);
-        setItems(allItems);
+        // Process orders and assign to vendors
+        // Note: Assuming orders have vendor_id field. If not, we'll need to match by other means
+        allOrders.forEach((order: any) => {
+          const vendorId = order.vendor_id || order.vendorId;
+          if (vendorId && statsByVendor[vendorId]) {
+            const status = order.order_status?.toLowerCase() || '';
+            const amount = parseFloat(order.total_amount) || 0;
+
+            // Count by status
+            if (status === 'pending') statsByVendor[vendorId].pending++;
+            else if (status === 'confirmed') statsByVendor[vendorId].confirmed++;
+            else if (status === 'processing') statsByVendor[vendorId].processing++;
+            else if (status === 'out-for-delivery') statsByVendor[vendorId].outForDelivery++;
+            else if (status === 'delivered' || status === 'completed') statsByVendor[vendorId].delivered++;
+            else if (status === 'cancelled') statsByVendor[vendorId].cancelled++;
+
+            // Add to total amount
+            statsByVendor[vendorId].totalAmount += amount;
+          }
+        });
+
+        // Calculate commissions for each vendor
+        Object.keys(statsByVendor).forEach((vendorIdStr) => {
+          const vendorId = parseInt(vendorIdStr);
+          const stats = statsByVendor[vendorId];
+          const vendorPercentage = 100 - adminCommissionPercentage;
+          stats.vendorCommission = (stats.totalAmount * vendorPercentage) / 100;
+          stats.adminCommission = (stats.totalAmount * adminCommissionPercentage) / 100;
+        });
+
+        setVendorStats(statsByVendor);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -380,339 +465,353 @@ function DashboardContent() {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [adminCommissionPercentage]);
 
-  // Helper functions to generate chart data
-  const generateMonthlyOrderData = () => {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentYear = new Date().getFullYear();
-    const monthlyCounts: number[] = Array(12).fill(0);
+  // Calculate total admin commission
+  const totalAdminCommission = Object.values(vendorStats).reduce(
+    (sum, stats) => sum + stats.adminCommission,
+    0
+  );
 
-    orders.forEach((order: any) => {
-      try {
-        const orderDate = new Date(order.created_at);
-        if (orderDate.getFullYear() === currentYear) {
-          const month = orderDate.getMonth();
-          monthlyCounts[month]++;
-        }
-      } catch (error) {
-        // Skip invalid dates
-      }
-    });
+  // Calculate total vendor commissions
+  const totalVendorCommissions = Object.values(vendorStats).reduce(
+    (sum, stats) => sum + stats.vendorCommission,
+    0
+  );
 
-    return months.map((label, index) => ({
-      label,
-      value: monthlyCounts[index],
-    }));
-  };
+  // Calculate total revenue
+  const totalRevenue = Object.values(vendorStats).reduce(
+    (sum, stats) => sum + stats.totalAmount,
+    0
+  );
 
-  const generateMonthlyEarningsData = () => {
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const currentYear = new Date().getFullYear();
-    const monthlyEarnings: number[] = Array(12).fill(0);
-
-    orders.forEach((order: any) => {
-      try {
-        const orderDate = new Date(order.created_at);
-        if (orderDate.getFullYear() === currentYear) {
-          const month = orderDate.getMonth();
-          const amount = parseFloat(order.total_amount) || 0;
-          monthlyEarnings[month] += amount;
-        }
-      } catch (error) {
-        // Skip invalid dates
-      }
-    });
-
-    return months.map((label, index) => ({
-      label,
-      value: Math.round(monthlyEarnings[index]),
-    }));
-  };
-
-  const generateTopProducts = () => {
-    // Count order items to find top selling products
-    const productCounts: { [key: string]: { count: number; item: any } } = {};
-
-    orders.forEach((order: any) => {
-      if (order.order_items && Array.isArray(order.order_items)) {
-        order.order_items.forEach((orderItem: any) => {
-          const itemId = orderItem.item_id || orderItem.id;
-          if (itemId) {
-            if (!productCounts[itemId]) {
-              productCounts[itemId] = { count: 0, item: orderItem };
-            }
-            productCounts[itemId].count += orderItem.quantity || 1;
-          }
-        });
-      }
-    });
-
-    // Convert to array and sort by count
-    const topProductsArray = Object.values(productCounts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4)
-      .map((p) => {
-        const item = items.find((i: any) => i.id === p.item.item_id) || p.item;
-        return {
-          name: item.item_name || item.name || "Unknown Product",
-          price: `$${parseFloat(item.price || 0).toFixed(2)}`,
-          rating: 4.5,
-          orders: p.count,
-          image: item.cover_image_url || item.image || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
-        };
-      });
-
-    // Return default if no products
-    if (topProductsArray.length === 0) {
-      return items.slice(0, 4).map((item: any) => ({
-        name: item.item_name || "Product",
-        price: `$${parseFloat(item.price || 0).toFixed(2)}`,
-        rating: 4.5,
-        orders: 0,
-        image: item.cover_image_url || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
-      }));
+  // Filter vendors based on search query
+  const filteredVendorStats = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return vendorStats;
     }
-
-    return topProductsArray;
-  };
-
-  const generateTopCustomers = () => {
-    const customerOrders: { [key: string]: { name: string; phone: string; count: number } } = {};
-
-    orders.forEach((order: any) => {
-      const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Unknown';
-      const customerPhone = order.customer_phone || '**********';
-      const key = `${customerName}_${customerPhone}`;
-
-      if (!customerOrders[key]) {
-        customerOrders[key] = {
-          name: customerName,
-          phone: customerPhone,
-          count: 0,
-        };
+    const query = searchQuery.toLowerCase();
+    const filtered: typeof vendorStats = {};
+    Object.entries(vendorStats).forEach(([vendorId, stats]) => {
+      if (stats.vendorName.toLowerCase().includes(query)) {
+        filtered[parseInt(vendorId)] = stats;
       }
-      customerOrders[key].count++;
     });
-
-    return Object.values(customerOrders)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4)
-      .map((c) => ({
-        name: c.name,
-        phone: c.phone,
-        orders: c.count,
-      }));
-  };
-
-  const generateRecentOrders = () => {
-    return orders
-      .sort((a: any, b: any) => {
-        const dateA = new Date(a.created_at);
-        const dateB = new Date(b.created_at);
-        return dateB.getTime() - dateA.getTime();
-      })
-      .slice(0, 5)
-      .map((order: any) => {
-        const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Customer';
-        const amount = parseFloat(order.total_amount) || 0;
-
-        // Format time ago
-        let timeAgo = 'Recently';
-        try {
-          const orderDate = new Date(order.created_at);
-          const now = new Date();
-          const diffMinutes = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60));
-
-          if (diffMinutes < 1) timeAgo = 'Just now';
-          else if (diffMinutes < 60) timeAgo = `${diffMinutes} mins ago`;
-          else if (diffMinutes < 1440) timeAgo = `${Math.floor(diffMinutes / 60)} hours ago`;
-          else timeAgo = `${Math.floor(diffMinutes / 1440)} days ago`;
-        } catch (e) {}
-
-        const statusMap: { [key: string]: "pending" | "confirmed" | "processing" | "delivered" | "cancelled" } = {
-          'pending': 'pending',
-          'confirmed': 'confirmed',
-          'processing': 'processing',
-          'delivered': 'delivered',
-          'cancelled': 'cancelled',
-        };
-
-        return {
-          id: order.order_number || order.id,
-          customer: customerName,
-          status: statusMap[order.order_status?.toLowerCase()] || 'pending',
-          time: timeAgo,
-          amount: `$${amount.toFixed(2)}`,
-        };
-      });
-  };
-
-  // Generate dynamic data from orders and items
-  const orderChartData = generateMonthlyOrderData();
-  const earningsChartData = generateMonthlyEarningsData();
-  const orderStatusData = [
-    { label: "Pending", value: stats.pending, color: "#f59e0b" },
-    { label: "Confirmed", value: stats.confirmed, color: "#10b981" },
-    { label: "Processing", value: stats.processing, color: "#3b82f6" },
-    { label: "Out for delivery", value: stats.outForDelivery, color: "#8b5cf6" },
-    { label: "Delivered", value: stats.delivered, color: "#22c55e" },
-    { label: "Cancelled", value: stats.cancelled, color: "#ef4444" },
-  ];
-  const topProducts = generateTopProducts();
-  const mostRatedProducts = topProducts; // Using same as top selling for now
-  const topCustomers = generateTopCustomers();
-  const recentOrders = generateRecentOrders();
-
-  // Demo data for dashboard (will be replaced with real data)
-  const orderStats = [
-    { title: "Pending", value: stats.pending, icon: Clock, color: "orange" as const },
-    {
-      title: "Confirmed",
-      value: stats.confirmed,
-      icon: CheckCircle,
-      color: "green" as const,
-    },
-    { title: "Processing", value: stats.processing, icon: Package, color: "blue" as const },
-    {
-      title: "Out for delivery",
-      value: stats.outForDelivery,
-      icon: Truck,
-      color: "purple" as const,
-    },
-  ];
-
-  const additionalStats = [
-    {
-      title: "Delivered",
-      value: stats.delivered,
-      icon: CheckCircle,
-      color: "green" as const,
-    },
-    { title: "Cancelled", value: stats.cancelled, icon: XCircle, color: "red" as const },
-    { title: "Returned", value: stats.returned, icon: RotateCcw, color: "gray" as const },
-    {
-      title: "Failed to Deliver",
-      value: stats.failed,
-      icon: AlertTriangle,
-      color: "red" as const,
-    },
-  ];
+    return filtered;
+  }, [vendorStats, searchQuery]);
 
   // Show loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading dashboard data...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+          <div className="text-lg text-gray-600">Loading dashboard data...</div>
+        </div>
       </div>
     );
   }
 
+  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl text-white p-6 lg:p-8">
-        <h1 className="text-2xl lg:text-3xl font-bold mb-2">
-          Welcome back, Admin! 👋
-        </h1>
-        <p className="text-red-100">
-          Monitor your business analytics and manage your food delivery
-          operations
-        </p>
-      </div>
-
-      {/* Business Analytics */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-xl lg:text-2xl font-semibold text-gray-800 mb-6">
-          Business Analytics
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6">
-          {orderStats.map((stat, index) => (
-            <StatsCard key={index} {...stat} />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-          {additionalStats.map((stat, index) => (
-            <StatsCard key={index} {...stat} />
-          ))}
-        </div>
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <Chart title="Order Statistics" data={orderChartData} type="line" />
-        <Chart
-          title="Earnings Statistics"
-          data={earningsChartData}
-          type="bar"
-          color="rgb(34, 197, 94)"
-        />
-      </div>
-
-      {/* Order Status and Recent Orders */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-1">
-          <OrderStatusChart data={orderStatusData} />
-        </div>
-        <div className="xl:col-span-2">
-          <RecentOrders orders={recentOrders} />
-        </div>
-      </div>
-
-      {/* Products and Customers Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Top Selling Products
-              </h3>
-              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                View All
-              </button>
+    <div className="space-y-6 pb-6">
+      {/* Hero Welcome Section */}
+      <div className="relative bg-gradient-to-r from-red-500 via-red-600 to-red-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-5"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative p-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div className="flex-1">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm p-3 rounded-xl">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl lg:text-4xl font-bold text-white mb-1">
+                    Admin Dashboard
+                  </h1>
+                  <p className="text-white text-opacity-80 text-sm">
+                    Monthly Statistics - {currentMonth}
+                  </p>
+                </div>
+              </div>
+              <p className="text-white text-opacity-90 text-lg mb-4">
+                Monitor vendor performance and commission distribution
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      Total Revenue: ${totalRevenue.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      Admin Commission: ${totalAdminCommission.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-2 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-4 h-4 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      {vendors.length} Vendors
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="p-4 space-y-4">
-            {topProducts.map((product, index) => (
-              <ProductCard key={index} {...product} />
-            ))}
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <DollarSign className="w-6 h-6 text-blue-600" />
+            <span className="text-3xl font-bold text-blue-700">
+              ${totalRevenue.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-blue-800">Total Revenue</p>
+        </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <TrendingUp className="w-6 h-6 text-green-600" />
+            <span className="text-3xl font-bold text-green-700">
+              ${totalAdminCommission.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-green-800">Admin Commission ({adminCommissionPercentage}%)</p>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200 p-6">
+          <div className="flex items-center justify-between mb-2">
+            <Users className="w-6 h-6 text-purple-600" />
+            <span className="text-3xl font-bold text-purple-700">
+              ${totalVendorCommissions.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-purple-800">Vendor Commissions</p>
+        </div>
+      </div>
+
+      {/* Vendor Statistics */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 p-6 lg:p-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="bg-red-50 p-2 rounded-lg">
+                <Activity className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  Vendor Monthly Statistics
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {Object.keys(filteredVendorStats).length} of {Object.keys(vendorStats).length} vendors
+                </p>
+              </div>
+            </div>
+            {/* Search Bar */}
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search vendors..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Most Rated Products
-              </h3>
-              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                View All
-              </button>
+        {/* Vendor Cards Container */}
+        <div className="p-6 lg:p-8">
+          {Object.keys(filteredVendorStats).length === 0 ? (
+            <div className="text-center py-12">
+              <Store className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">
+                {searchQuery ? "No vendors found matching your search" : "No vendor data available for this month"}
+              </p>
             </div>
-          </div>
-          <div className="p-4 space-y-4">
-            {mostRatedProducts.map((product, index) => (
-              <ProductCard key={index} {...product} />
-            ))}
-          </div>
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {Object.entries(filteredVendorStats).map(([vendorId, stats]) => (
+                <div
+                  key={vendorId}
+                  className="group bg-gradient-to-br from-white to-gray-50 rounded-xl border border-gray-200 p-6 hover:shadow-xl hover:border-red-300 transition-all duration-300 hover:-translate-y-1"
+                >
+                  {/* Vendor Header - Enhanced */}
+                  <div className="flex items-start justify-between mb-5 pb-5 border-b-2 border-gray-200">
+                    <div className="flex items-center space-x-3 flex-1">
+                      <div className="relative">
+                        <div className="bg-gradient-to-br from-red-100 to-red-200 p-3 rounded-xl shadow-sm">
+                          <Store className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg font-bold text-gray-800 truncate group-hover:text-red-600 transition-colors">
+                          {stats.vendorName}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5 flex items-center">
+                          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-1.5"></span>
+                          Vendor ID: {vendorId}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right ml-4 bg-gradient-to-br from-gray-50 to-gray-100 px-4 py-3 rounded-xl border border-gray-200">
+                      <p className="text-xs text-gray-600 mb-1 font-medium">Total Amount</p>
+                      <p className="text-2xl font-bold text-gray-800">
+                        ${stats.totalAmount.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
 
-        <div className="bg-white rounded-xl border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">
-                Top Customers
-              </h3>
-              <button className="text-sm text-red-600 hover:text-red-700 font-medium">
-                View All
-              </button>
+                  {/* Order Status Breakdown - Beautiful Cards */}
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-600 mb-4 uppercase tracking-wide flex items-center">
+                      <Activity className="w-3 h-3 mr-2" />
+                      Order Status
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {/* Pending */}
+                      <div className="group relative bg-gradient-to-br from-orange-50 via-orange-50 to-orange-100 rounded-xl p-4 border-2 border-orange-200 hover:border-orange-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-orange-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <Clock className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <p className="text-xs text-orange-600 font-semibold mb-1">Pending</p>
+                          <p className="text-2xl font-bold text-orange-700">{stats.pending}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-orange-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+
+                      {/* Confirmed */}
+                      <div className="group relative bg-gradient-to-br from-green-50 via-green-50 to-green-100 rounded-xl p-4 border-2 border-green-200 hover:border-green-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-green-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                          </div>
+                          <p className="text-xs text-green-600 font-semibold mb-1">Confirmed</p>
+                          <p className="text-2xl font-bold text-green-700">{stats.confirmed}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-green-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+
+                      {/* Processing */}
+                      <div className="group relative bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-blue-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                          </div>
+                          <p className="text-xs text-blue-600 font-semibold mb-1">Processing</p>
+                          <p className="text-2xl font-bold text-blue-700">{stats.processing}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-blue-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+
+                      {/* Out for Delivery */}
+                      <div className="group relative bg-gradient-to-br from-purple-50 via-purple-50 to-purple-100 rounded-xl p-4 border-2 border-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-purple-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <Truck className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <p className="text-xs text-purple-600 font-semibold mb-1">Out Delivery</p>
+                          <p className="text-2xl font-bold text-purple-700">{stats.outForDelivery}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-purple-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+
+                      {/* Delivered */}
+                      <div className="group relative bg-gradient-to-br from-emerald-50 via-emerald-50 to-emerald-100 rounded-xl p-4 border-2 border-emerald-200 hover:border-emerald-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-emerald-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <PackageCheck className="w-4 h-4 text-emerald-600" />
+                          </div>
+                          <p className="text-xs text-emerald-600 font-semibold mb-1">Delivered</p>
+                          <p className="text-2xl font-bold text-emerald-700">{stats.delivered}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+
+                      {/* Cancelled */}
+                      <div className="group relative bg-gradient-to-br from-red-50 via-red-50 to-red-100 rounded-xl p-4 border-2 border-red-200 hover:border-red-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="flex flex-col items-center">
+                          <div className="bg-red-100 p-2 rounded-lg mb-2 group-hover:scale-110 transition-transform">
+                            <XCircle className="w-4 h-4 text-red-600" />
+                          </div>
+                          <p className="text-xs text-red-600 font-semibold mb-1">Cancelled</p>
+                          <p className="text-2xl font-bold text-red-700">{stats.cancelled}</p>
+                        </div>
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-red-200 opacity-20 rounded-full -mr-6 -mt-6"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Commission Breakdown - Beautiful Cards */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 mb-4 uppercase tracking-wide flex items-center">
+                      <DollarSign className="w-3 h-3 mr-2" />
+                      Commission Split
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Vendor Commission */}
+                      <div className="group relative bg-gradient-to-br from-green-50 via-green-50 to-green-100 rounded-xl p-4 border-2 border-green-200 hover:border-green-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-green-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+                        <div className="relative">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="bg-green-200 p-1.5 rounded-lg">
+                                <Users className="w-3.5 h-3.5 text-green-700" />
+                              </div>
+                              <p className="text-xs text-green-700 font-semibold">Vendor</p>
+                            </div>
+                            <span className="text-xs text-green-600 font-medium bg-green-200 px-2 py-0.5 rounded-full">
+                              {100 - adminCommissionPercentage}%
+                            </span>
+                          </div>
+                          <p className="text-2xl font-bold text-green-700">
+                            ${stats.vendorCommission.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Admin Commission */}
+                      <div className="group relative bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 rounded-xl p-4 border-2 border-blue-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 overflow-hidden">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-blue-200 opacity-20 rounded-full -mr-8 -mt-8"></div>
+                        <div className="relative">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center space-x-2">
+                              <div className="bg-blue-200 p-1.5 rounded-lg">
+                                <TrendingUp className="w-3.5 h-3.5 text-blue-700" />
+                              </div>
+                              <p className="text-xs text-blue-700 font-semibold">Admin</p>
+                            </div>
+                            <span className="text-xs text-blue-600 font-medium bg-blue-200 px-2 py-0.5 rounded-full">
+                              {adminCommissionPercentage}%
+                            </span>
+                          </div>
+                          <p className="text-2xl font-bold text-blue-700">
+                            ${stats.adminCommission.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="p-4 space-y-4">
-            {topCustomers.map((customer, index) => (
-              <CustomerCard key={index} {...customer} />
-            ))}
-          </div>
+          )}
         </div>
       </div>
     </div>

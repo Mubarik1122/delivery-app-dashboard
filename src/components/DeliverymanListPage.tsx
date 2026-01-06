@@ -55,13 +55,12 @@ export default function DeliverymanListPage() {
     try {
       setLoading(true);
       setError("");
-      const response = await apiService.getUsers();
+      // Call API with role=Rider
+      const response = await apiService.getUsers('Rider');
 
       if (response.errorCode === 0 && response.data) {
-        // Filter only users with role 'driver'
-        const drivers = response.data.filter(
-          (user) => user.role_name === "Rider"
-        );
+        // API will return only riders
+        const drivers = Array.isArray(response.data) ? response.data : [response.data];
 
         // Map API data to component format
         const mappedDrivers: DeliverymanData[] = drivers.map((driver) => ({
@@ -89,6 +88,7 @@ export default function DeliverymanListPage() {
           payedAmount: 0,
           pendingAmount: 0,
           status: driver.is_active !== false ? "active" : "inactive",
+          avatar: driver.restaurant_image || driver.agreement_docs, // Use restaurant_image or agreement_docs as avatar
         }));
 
         setDeliverymen(mappedDrivers);
@@ -185,7 +185,6 @@ export default function DeliverymanListPage() {
       "Phone",
       "Address",
       "Joining Date",
-      "Total Orders",
       "Status",
     ];
 
@@ -196,7 +195,6 @@ export default function DeliverymanListPage() {
       driver.phone,
       driver.address.replace(/,/g, ";"),
       driver.joiningDate,
-      driver.totalOrders,
       driver.status,
     ]);
 
@@ -444,16 +442,16 @@ export default function DeliverymanListPage() {
                       Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contact Info
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Phone
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Address
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joining Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Orders
                     </th>
                     {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -471,32 +469,32 @@ export default function DeliverymanListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            {deliveryman.avatar ? (
-                              <img
-                                src={deliveryman.avatar}
-                                alt={deliveryman.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
+                          {deliveryman.avatar ? (
+                            <img
+                              src={deliveryman.avatar}
+                              alt={deliveryman.name}
+                              className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
                               <User className="w-5 h-5 text-gray-500" />
-                            )}
-                          </div>
+                            </div>
+                          )}
                           <span className="text-sm font-medium text-gray-900">
                             {deliveryman.name}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <div>
-                          <div className="flex items-center space-x-1">
-                            <Mail className="w-3 h-3 text-gray-400" />
-                            <span>{deliveryman.email}</span>
-                          </div>
-                          <div className="flex items-center space-x-1 mt-1">
-                            <Phone className="w-3 h-3 text-gray-400" />
-                            <span>{deliveryman.phone}</span>
-                          </div>
+                        <div className="flex items-center space-x-1">
+                          <Mail className="w-3 h-3 text-gray-400" />
+                          <span>{deliveryman.email}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <div className="flex items-center space-x-1">
+                          <Phone className="w-3 h-3 text-gray-400" />
+                          <span>{deliveryman.phone}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
@@ -506,9 +504,6 @@ export default function DeliverymanListPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {deliveryman.joiningDate}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                        {deliveryman.totalOrders}
                       </td>
                       {/* <td className="px-6 py-4 whitespace-nowrap">
                         <button

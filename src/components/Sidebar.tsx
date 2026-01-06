@@ -14,6 +14,7 @@ import {
   Mail,
   Menu,
   X,
+  PlusCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -63,6 +64,7 @@ export default function Sidebar({
       { id: "pos", label: "POS", icon: Utensils },
       { id: "categories", label: "Categories", icon: Package },
       { id: "items", label: "Items", icon: Utensils },
+      { id: "addons", label: "Addons", icon: PlusCircle },
       { id: "all-orders", label: "Orders", icon: ShoppingCart },
     ];
 

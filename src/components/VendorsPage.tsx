@@ -25,6 +25,7 @@ interface VendorData {
   phone: string;
   address: string;
   restaurantName: string;
+  restaurantImage?: string;
   joinDate: string;
   status: "active" | "inactive";
   totalOrders: number;
@@ -42,6 +43,28 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedVendor, setSelectedVendor] = useState<VendorData | null>(null);
+
+  // Image base URL from environment variable (only for images, not for API calls)
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return "";
+    
+    // Trim the path to remove any leading/trailing spaces
+    const trimmedPath = imagePath.trim();
+    
+    // If already a full URL (starts with http:// or https://), return as is
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    
+    // Remove leading slash if present
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    
+    // Join base URL and path without double slashes
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
 
   useEffect(() => {
     loadVendors();
@@ -69,6 +92,7 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
             vendor.street_address2 ? ", " + vendor.street_address2 : ""
           }, ${vendor.city}, ${vendor.state} ${vendor.zip_code}`,
           restaurantName: vendor.restaurant_name || "Restaurant",
+          restaurantImage: getImageUrl(vendor.restaurant_image),
           joinDate: vendor.created_at
             ? new Date(vendor.created_at).toLocaleDateString()
             : "N/A",
@@ -154,8 +178,6 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
       "Address",
       "Join Date",
       "Status",
-      "Total Orders",
-      "Revenue",
     ];
 
     const csvRows = filteredVendors.map((vendor) => [
@@ -166,8 +188,6 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
       vendor.address.replace(/,/g, ";"),
       vendor.joinDate,
       vendor.status,
-      vendor.totalOrders,
-      vendor.revenue.toFixed(2),
     ]);
 
     const csvContent = [
@@ -341,22 +361,16 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Vendor
+                        Restaurant
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Restaurant
+                        Vendor
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Contact
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Join Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Orders
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Revenue
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
@@ -371,25 +385,35 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                       <tr key={vendor.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-gray-500" />
-                            </div>
+                            {vendor.restaurantImage ? (
+                              <img
+                                src={vendor.restaurantImage}
+                                alt={vendor.restaurantName}
+                                className="w-12 h-12 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <Building className="w-6 h-6 text-gray-500" />
+                              </div>
+                            )}
                             <div>
                               <div className="text-sm font-medium text-gray-900">
-                                {vendor.name}
+                                {vendor.restaurantName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {vendor.email}
+                                {vendor.address}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {vendor.restaurantName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {vendor.address}
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {vendor.name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {vendor.email}
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -399,12 +423,6 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {vendor.joinDate}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {vendor.totalOrders}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ${vendor.revenue.toFixed(2)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
@@ -512,9 +530,17 @@ export default function VendorsPage({ onAddVendor }: VendorsPageProps) {
             <div className="p-6">
               {/* Vendor Info */}
               <div className="flex items-start space-x-4 mb-6">
-                <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User className="w-8 h-8 text-gray-500" />
-                </div>
+                {selectedVendor.restaurantImage ? (
+                  <img
+                    src={selectedVendor.restaurantImage}
+                    alt={selectedVendor.restaurantName}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-gray-500" />
+                  </div>
+                )}
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-800 mb-1">
                     {selectedVendor.name}

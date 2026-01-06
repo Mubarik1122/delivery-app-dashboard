@@ -54,6 +54,28 @@ export default function POSPage() {
   const DEFAULT_COVER_IMAGE =
     "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
 
+  // Image base URL from environment variable (only for images, not for API calls)
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return DEFAULT_COVER_IMAGE;
+    
+    // Trim the path to remove any leading/trailing spaces
+    const trimmedPath = imagePath.trim();
+    
+    // If already a full URL (starts with http:// or https://), return as is
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    
+    // Remove leading slash if present
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    
+    // Join base URL and path without double slashes
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
   useEffect(() => {
     loadData();
     loadCart();
@@ -76,8 +98,7 @@ export default function POSPage() {
           shortDescription:
             item.short_description || item.shortDescription || "",
           longDescription: item.long_description || item.longDescription || "",
-          coverImageUrl:
-            item.cover_image_url || item.coverImageUrl || DEFAULT_COVER_IMAGE,
+          coverImageUrl: getImageUrl(item.cover_image_url || item.coverImageUrl) || DEFAULT_COVER_IMAGE,
           backgroundImageUrl:
             item.background_image_url || item.backgroundImageUrl || "",
           categoryIds: Array.isArray(item.categories)
@@ -102,7 +123,7 @@ export default function POSPage() {
           shortDescription: cat.short_description || cat.shortDescription,
           longDescription: cat.long_description || cat.longDescription,
           isSubCategory: cat.is_sub_category || cat.isSubCategory,
-          coverImage: cat.cover_image || cat.coverImage || DEFAULT_COVER_IMAGE,
+          coverImage: getImageUrl(cat.cover_image || cat.coverImage),
           parentCategoryIds: Array.isArray(cat.parent_categories)
             ? cat.parent_categories.map((p: any) => p.id)
             : [],
@@ -127,7 +148,7 @@ export default function POSPage() {
             name: item.item_name || "Item",
             price: Number(item.unit_price) || Number(item.price) || 0,
             quantity: item.quantity,
-            image: item.cover_image_url || DEFAULT_COVER_IMAGE,
+            image: getImageUrl(item.cover_image_url) || DEFAULT_COVER_IMAGE,
           })
         );
         setCart(cartItems);
@@ -391,7 +412,7 @@ export default function POSPage() {
                     className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:shadow-lg transition-all duration-200"
                   >
                     <img
-                      src={item.coverImageUrl}
+                      src={getImageUrl(item.coverImageUrl)}
                       alt={item.itemName}
                       className="w-full h-32 object-cover rounded-lg mb-3"
                       onError={(e) => {
@@ -477,7 +498,7 @@ export default function POSPage() {
                       >
                         <div className="flex items-center space-x-3 flex-1">
                           <img
-                            src={item.image}
+                            src={getImageUrl(item.image)}
                             alt={item.name}
                             className="w-12 h-12 rounded object-cover"
                           />

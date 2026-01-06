@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import {
   User,
@@ -13,6 +13,7 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Image as ImageIcon,
 } from "lucide-react";
 import { apiService, CreateUserRequest } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -34,12 +35,62 @@ export default function AddDeliverymanPage() {
     zipCode: "",
     description: "",
     agreement: null as File | null,
+    profileImage: null as File | null,
     password: "",
     confirmPassword: "",
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
   });
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  const convertImageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result);
+      };
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+      if (!allowedTypes.includes(file.type)) {
+        setError("Please select a valid image file (JPG, PNG, or GIF)");
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size should be less than 5MB");
+        return;
+      }
+
+      setFormData((prev) => ({ ...prev, profileImage: file }));
+
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.profileImage) {
+      setError("Please upload a profile image");
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
@@ -55,6 +106,20 @@ export default function AddDeliverymanPage() {
     setError("");
 
     try {
+      let profileImageBase64: string | undefined;
+      
+      // Convert image to base64
+      if (formData.profileImage) {
+        profileImageBase64 = await convertImageToBase64(formData.profileImage);
+      }
+
+      // Validate latitude and longitude
+      if (!formData.latitude || !formData.longitude) {
+        setError("Please select an address from the suggestions to get location coordinates");
+        setIsSubmitting(false);
+        return;
+      }
+
       const requestData: CreateUserRequest = {
         role_name: "Rider", // Default role is Rider
         first_name: formData.firstName.trim(),
@@ -67,6 +132,9 @@ export default function AddDeliverymanPage() {
         zip_code: formData.zipCode.trim(),
         description: formData.description.trim() || "Delivery rider",
         agreement_docs: formData.agreement?.name || undefined,
+        restaurant_image: profileImageBase64, // Using restaurant_image field for profile image
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         password: formData.password,
       };
 
@@ -264,17 +332,23 @@ export default function AddDeliverymanPage() {
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
+                    ref={addressInputRef}
                     type="text"
                     value={formData.address}
                     onChange={(e) =>
                       handleInputChange("address", e.target.value)
                     }
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                    placeholder="Enter street address"
+                    placeholder="Search for address or location"
                     required
                     disabled={isSubmitting}
                   />
                 </div>
+                {(formData.latitude && formData.longitude) && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Location: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -336,6 +410,55 @@ export default function AddDeliverymanPage() {
                   placeholder="Brief description about the delivery person (optional)"
                   disabled={isSubmitting}
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Image *
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-red-400 transition-colors">
+                    <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-600 mb-2">
+                      {formData.profileImage
+                        ? formData.profileImage.name
+                        : "Click to upload or drag and drop"}
+                    </p>
+                    <p className="text-xs text-gray-500 mb-4">
+                      PNG, JPG, GIF up to 5MB
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                      id="profile-image-upload"
+                      disabled={isSubmitting}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        document.getElementById("profile-image-upload")?.click()
+                      }
+                      className="text-red-600 hover:text-red-700 text-sm font-medium flex items-center space-x-1 mx-auto"
+                      disabled={isSubmitting}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span>Choose File</span>
+                    </button>
+                  </div>
+                  {imagePreview && (
+                    <div className="flex items-center justify-center">
+                      <div className="relative w-full">
+                        <img
+                          src={imagePreview}
+                          alt="Profile preview"
+                          className="w-full h-auto max-h-64 object-contain rounded-lg border border-gray-300 bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
