@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
@@ -43,6 +43,7 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   const [success, setSuccess] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ApiUser | null>(null);
   const [formData, setFormData] = useState<Partial<ApiUser>>({});
+  const hasFetchedRef = useRef(false);
 
   // Image base URL from environment variable (only for images, not for API calls)
   const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
@@ -95,6 +96,9 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
   };
 
   useEffect(() => {
+    // Prevent multiple calls due to React StrictMode
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
     fetchUserProfile();
   }, []);
 
@@ -648,28 +652,49 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
             </div>
           )}
 
+          {/* Agreement Document (for All Roles) */}
+          {profileData.agreement_docs && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
+              <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
+                <FileText className="w-5 h-5 mr-2 text-red-500" />
+                Agreement Document
+              </h3>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-blue-500 p-3 rounded-lg">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-700 mb-1">Agreement Document</p>
+                    <p className="text-xs text-gray-500 mb-4">View or download your agreement document</p>
+                    <a 
+                      href={getImageUrl(profileData.agreement_docs)} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>View Document</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Documents (for Riders) */}
           {profileData.role_name?.toLowerCase() === "rider" && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
               <h3 className="text-lg font-semibold text-gray-800 mb-6 flex items-center">
                 <FileText className="w-5 h-5 mr-2 text-red-500" />
-                Documents
+                Additional Documents
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {profileData.agreement_docs && (
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <Award className="w-6 h-6 text-blue-600 mb-2" />
-                    <p className="text-sm font-medium text-gray-800 mb-1">Agreement</p>
-                    <a href={profileData.agreement_docs} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
-                      View Document
-                    </a>
-                  </div>
-                )}
                 {profileData.certificate_doc && (
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <Award className="w-6 h-6 text-green-600 mb-2" />
                     <p className="text-sm font-medium text-gray-800 mb-1">Certificate</p>
-                    <a href={profileData.certificate_doc} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                    <a href={getImageUrl(profileData.certificate_doc)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
                       View Document
                     </a>
                   </div>
@@ -678,13 +703,13 @@ export default function ProfilePage({ onBack }: ProfilePageProps) {
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <Award className="w-6 h-6 text-purple-600 mb-2" />
                     <p className="text-sm font-medium text-gray-800 mb-1">Driver License</p>
-                    <a href={profileData.driver_licence_doc} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                    <a href={getImageUrl(profileData.driver_licence_doc)} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
                       View Document
                     </a>
                   </div>
                 )}
-                {!profileData.agreement_docs && !profileData.certificate_doc && !profileData.driver_licence_doc && (
-                  <p className="text-gray-500 text-sm col-span-3">No documents uploaded</p>
+                {!profileData.certificate_doc && !profileData.driver_licence_doc && (
+                  <p className="text-gray-500 text-sm col-span-3">No additional documents uploaded</p>
                 )}
               </div>
             </div>

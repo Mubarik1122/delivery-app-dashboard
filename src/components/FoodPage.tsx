@@ -107,7 +107,7 @@ export default function FoodPage() {
   };
 
   const handleEditItem = (item: Item) => {
-    navigate("/items/update", { state: { editItem: item } });
+    navigate(`/items/update?id=${item.id}`, { state: { itemId: item.id, editItem: item } });
   };
 
   const handleViewItem = (item: Item) => {

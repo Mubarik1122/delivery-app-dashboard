@@ -24,6 +24,9 @@ import {
   ShoppingCart,
   Copy,
   Check,
+  Plus,
+  Sparkles,
+  FileText,
 } from "lucide-react";
 import { apiService } from "../services/api";
 
@@ -83,7 +86,7 @@ interface OrderDetail {
     location_updated_at?: string;
   };
   order_items: Array<{
-    item_id: string;
+    item_id: string | number;
     item_name: string;
     short_description?: string;
     long_description?: string;
@@ -91,9 +94,22 @@ interface OrderDetail {
     cover_image_url?: string;
     unit_price: string;
     total_quantity: number;
+    size_id?: number | null;
+    size_name?: string | null;
+    flavor_id?: number | null;
+    flavor_name?: string | null;
+    notes?: string | null;
+    addons?: Array<{
+      addon_id: number;
+      addon_name: string;
+      addon_description?: string;
+      addon_price: number | string;
+      addon_quantity: number;
+    }>;
   }>;
   total_items: number;
   total_quantity: number;
+  order_notes?: string | null;
   payments?: Array<{
     id: number;
     payment_method: string;
@@ -136,6 +152,20 @@ export default function OrderDetailPage() {
   const [copied, setCopied] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+
+  // Image base URL from environment variable
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return "";
+    const trimmedPath = imagePath.trim();
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
 
   const fetchOrderDetail = async () => {
     try {
@@ -245,14 +275,41 @@ export default function OrderDetailPage() {
     
     const vendorAddress = `${orderData.vendor.address1}${orderData.vendor.address2 ? ', ' + orderData.vendor.address2 : ''}, ${orderData.vendor.city}, ${orderData.vendor.state} ${orderData.vendor.zip_code}`;
     
-    const itemsHTML = orderData.order_items.map(item => `
+    const itemsHTML = orderData.order_items.map((item, index) => {
+      const sizeInfo = item.size_name ? `<div style="font-size: 11px; color: #3b82f6; margin-top: 2px;"><strong>Size:</strong> ${item.size_name}</div>` : '';
+      const flavorInfo = item.flavor_name ? `<div style="font-size: 11px; color: #9333ea; margin-top: 2px;"><strong>Flavor:</strong> ${item.flavor_name}</div>` : '';
+      const addonsInfo = item.addons && item.addons.length > 0 
+        ? `<div style="margin-top: 4px; padding: 6px; background: #f0fdf4; border-left: 3px solid #22c55e; border-radius: 4px;">
+            <div style="font-size: 10px; font-weight: bold; color: #15803d; margin-bottom: 4px;">ADDONS:</div>
+            ${item.addons.map((addon: any) => 
+              `<div style="font-size: 11px; color: #166534; margin-left: 8px; margin-top: 2px;">
+                • ${addon.addon_name}${addon.addon_quantity > 1 ? ` (×${addon.addon_quantity})` : ''}${parseFloat(String(addon.addon_price || "0")) > 0 ? ` (+$${parseFloat(String(addon.addon_price)).toFixed(2)})` : ''}
+              </div>`
+            ).join('')}
+          </div>`
+        : '';
+      const notesInfo = item.notes 
+        ? `<div style="margin-top: 4px; padding: 6px; background: #fefce8; border-left: 3px solid #eab308; border-radius: 4px;">
+            <div style="font-size: 10px; font-weight: bold; color: #854d0e; margin-bottom: 2px;">NOTE:</div>
+            <div style="font-size: 11px; color: #713f12; margin-left: 8px;">${item.notes}</div>
+          </div>`
+        : '';
+      
+      return `
       <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${item.item_name}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.total_quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">$${parseFloat(item.unit_price || "0").toFixed(2)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">$${(parseFloat(item.unit_price || "0") * item.total_quantity).toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+          <div style="font-weight: bold;">${item.item_name}</div>
+          ${sizeInfo}
+          ${flavorInfo}
+          ${addonsInfo}
+          ${notesInfo}
+        </td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center; vertical-align: top;">${item.total_quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; vertical-align: top;">$${parseFloat(item.unit_price || "0").toFixed(2)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; vertical-align: top;">$${(parseFloat(item.unit_price || "0") * item.total_quantity).toFixed(2)}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -381,6 +438,12 @@ export default function OrderDetailPage() {
         <span class="info-label">Status:</span>
         <span>${orderData.order_status}</span>
       </div>
+      ${orderData.order_notes ? `
+      <div style="margin-top: 15px; padding: 12px; background: #fefce8; border-left: 4px solid #eab308; border-radius: 4px;">
+        <div style="font-weight: bold; color: #854d0e; margin-bottom: 6px; font-size: 13px;">ORDER NOTES:</div>
+        <div style="color: #713f12; font-size: 13px; white-space: pre-wrap;">${orderData.order_notes}</div>
+      </div>
+      ` : ''}
     </div>
 
     <div class="section">
@@ -551,6 +614,7 @@ export default function OrderDetailPage() {
   const paymentStatus = mapPaymentStatus(order.payment_status);
 
   const DEFAULT_IMAGE = "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
+  const DEFAULT_VENDOR_IMAGE = "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg?auto=compress&cs=tinysrgb&w=300";
 
   return (
     <>
@@ -579,6 +643,15 @@ export default function OrderDetailPage() {
               <span>Date:</span>
               <span>{formatDate(order.created_at)} {formatTime(order.created_at)}</span>
             </div>
+            {order.order_notes && (
+              <>
+                <div className="receipt-divider"></div>
+                <div style={{ margin: '4px 0', padding: '6px', background: '#fefce8', borderLeft: '2px solid #eab308', borderRadius: '2px' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '9px', color: '#854d0e', marginBottom: '2px' }}>ORDER NOTES:</div>
+                  <div style={{ fontSize: '9px', color: '#713f12', whiteSpace: 'pre-wrap' }}>{order.order_notes}</div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="receipt-divider"></div>
@@ -590,14 +663,27 @@ export default function OrderDetailPage() {
               <span className="item-price">Price</span>
               <span className="item-total">Total</span>
             </div>
-            {order.order_items.map((item, index) => (
-              <div key={item.item_id || index} className="item-row">
-                <span className="item-name">{item.item_name}</span>
-                <span className="item-qty">{item.total_quantity}</span>
-                <span className="item-price">${parseFloat(item.unit_price || "0").toFixed(2)}</span>
-                <span className="item-total">${(parseFloat(item.unit_price || "0") * item.total_quantity).toFixed(2)}</span>
-              </div>
-            ))}
+            {order.order_items.map((item, index) => {
+              const sizeInfo = item.size_name ? `\nSize: ${item.size_name}` : '';
+              const flavorInfo = item.flavor_name ? `\nFlavor: ${item.flavor_name}` : '';
+              const addonsInfo = item.addons && item.addons.length > 0 
+                ? `\nAddons: ${item.addons.map((addon: any) => 
+                    `${addon.addon_name}${addon.addon_quantity > 1 ? ` (×${addon.addon_quantity})` : ''}${parseFloat(String(addon.addon_price || "0")) > 0 ? ` (+$${parseFloat(String(addon.addon_price)).toFixed(2)})` : ''}`
+                  ).join(', ')}`
+                : '';
+              const notesInfo = item.notes ? `\nNote: ${item.notes}` : '';
+              
+              return (
+                <div key={item.item_id || index}>
+                  <div className="item-row">
+                    <span className="item-name">{item.item_name}{sizeInfo}{flavorInfo}{addonsInfo}{notesInfo}</span>
+                    <span className="item-qty">{item.total_quantity}</span>
+                    <span className="item-price">${parseFloat(item.unit_price || "0").toFixed(2)}</span>
+                    <span className="item-total">${(parseFloat(item.unit_price || "0") * item.total_quantity).toFixed(2)}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="receipt-divider"></div>
@@ -744,88 +830,174 @@ export default function OrderDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Order Items */}
+          {/* Order Notes */}
+          {order.order_notes && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 shadow-sm">
+              <div className="flex items-start">
+                <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 mr-3 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-yellow-800 mb-1">Order Notes</h4>
+                  <p className="text-sm text-yellow-700 whitespace-pre-wrap">{order.order_notes}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Order Items - Kitchen Friendly Display */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-800">
                 Order Items ({order.total_items} items, {order.total_quantity} total)
               </h3>
             </div>
-            <div className="overflow-x-auto">
+            <div className="p-6 space-y-4">
               {order.order_items && order.order_items.length > 0 ? (
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Item</th>
-                      <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Description</th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Unit Price</th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Quantity</th>
-                      <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {order.order_items.map((item, index) => (
-                      <tr key={item.item_id || index} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center space-x-3">
-                            <img
-                              src={item.cover_image_url || DEFAULT_IMAGE}
-                              alt={item.item_name}
-                              className="w-12 h-12 rounded-lg object-cover border border-gray-200"
-                              onError={(e) => {
-                                e.currentTarget.src = DEFAULT_IMAGE;
-                              }}
-                            />
-                            <div>
-                              <div className="text-sm font-medium text-gray-900">
-                                {item.item_name}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                ID: {item.item_id}
-                              </div>
+                order.order_items.map((item, index) => (
+                  <div
+                    key={`${item.item_id}-${index}`}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
+                  >
+                    {/* Item Header */}
+                    <div className="flex items-start space-x-4 mb-3">
+                      <img
+                        src={getImageUrl(item.cover_image_url) || DEFAULT_IMAGE}
+                        alt={item.item_name}
+                        className="w-20 h-20 rounded-lg object-cover border-2 border-gray-200 flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = DEFAULT_IMAGE;
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="text-lg font-bold text-gray-900 mb-1">
+                              {item.item_name}
+                            </h4>
+                            {item.short_description && (
+                              <p className="text-sm text-gray-600 mb-2">{item.short_description}</p>
+                            )}
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="text-lg font-bold text-green-700">
+                              ${(parseFloat(String(item.unit_price || "0")) * item.total_quantity).toFixed(2)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ${parseFloat(String(item.unit_price || "0")).toFixed(2)} × {item.total_quantity}
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-600 max-w-xs">
-                            {item.short_description || "No description"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Size and Flavor */}
+                    {(item.size_name || item.flavor_name) && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {item.size_name && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+                            Size: {item.size_name}
+                          </span>
+                        )}
+                        {item.flavor_name && (
+                          <span className="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold bg-purple-50 text-purple-800 border border-purple-200">
+                            Flavor: {item.flavor_name}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Addons - Eye-catching Design */}
+                    {item.addons && item.addons.length > 0 && (
+                      <div className="mb-4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-emerald-400/10 to-teal-400/10 rounded-xl"></div>
+                        <div className="relative bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border-2 border-green-300 shadow-lg">
+                          <div className="flex items-center space-x-2 mb-3">
+                            <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-2 rounded-lg shadow-md">
+                              <Plus className="w-4 h-4 text-white" />
+                            </div>
+                            <h5 className="text-sm font-bold text-green-800 uppercase tracking-wider">
+                              Addons ({item.addons.length})
+                            </h5>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm font-medium text-gray-900">
-                            ${parseFloat(item.unit_price || "0").toFixed(2)}
+                          <div className="space-y-2.5">
+                            {item.addons.map((addon, addonIndex) => (
+                              <div
+                                key={addonIndex}
+                                className="flex items-center justify-between bg-white rounded-lg p-3 border border-green-200 shadow-sm hover:shadow-md transition-all hover:scale-[1.02]"
+                              >
+                                <div className="flex items-center space-x-3 flex-1">
+                                  <div className="relative">
+                                    <div className="w-3 h-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-sm"></div>
+                                    <div className="absolute inset-0 w-3 h-3 bg-green-400 rounded-full animate-ping opacity-75"></div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <span className="font-bold text-gray-900 text-sm">
+                                      {addon.addon_name}
+                                    </span>
+                                    {addon.addon_description && (
+                                      <p className="text-xs text-gray-600 mt-0.5">
+                                        {addon.addon_description}
+                                      </p>
+                                    )}
+                                    {addon.addon_quantity > 1 && (
+                                      <span className="inline-block ml-2 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-semibold rounded-full">
+                                        × {addon.addon_quantity}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {parseFloat(String(addon.addon_price || "0")) > 0 && (
+                                  <div className="ml-3">
+                                    <span className="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-800 text-sm font-bold rounded-lg border border-green-300">
+                                      +${parseFloat(String(addon.addon_price)).toFixed(2)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm font-medium text-gray-900">
-                            {item.total_quantity}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Item Notes - Powerful Design */}
+                    {item.notes && (
+                      <div className="mb-3 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 via-amber-400/20 to-orange-400/20 rounded-xl"></div>
+                        <div className="relative bg-gradient-to-br from-yellow-50 via-amber-50 to-orange-50 rounded-xl p-4 border-2 border-yellow-400 shadow-lg">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <div className="bg-gradient-to-br from-yellow-500 to-orange-600 p-2 rounded-lg shadow-md">
+                              <FileText className="w-4 h-4 text-white" />
+                            </div>
+                            <h5 className="text-sm font-bold text-yellow-900 uppercase tracking-wider">
+                              Special Instructions
+                            </h5>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="text-sm font-semibold text-green-700">
-                            ${(parseFloat(item.unit_price || "0") * item.total_quantity).toFixed(2)}
+                          <div className="bg-white rounded-lg p-3 border-2 border-yellow-300 shadow-sm">
+                            <p className="text-sm font-semibold text-yellow-900 whitespace-pre-wrap leading-relaxed">
+                              {item.notes}
+                            </p>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50 border-t border-gray-200">
-                    <tr>
-                      <td colSpan={4} className="px-6 py-4 text-right text-sm font-semibold text-gray-700">
-                        Grand Total:
-                      </td>
-                      <td className="px-6 py-4 text-right text-sm font-bold text-gray-900">
-                        ${parseFloat(order.total_amount || "0").toFixed(2)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))
               ) : (
                 <div className="text-center py-8">
                   <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-500">No items found for this order</p>
                 </div>
               )}
+
+              {/* Total Summary */}
+              <div className="mt-6 pt-4 border-t-2 border-gray-300">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold text-gray-700">Grand Total:</span>
+                  <span className="text-2xl font-bold text-green-700">
+                    ${parseFloat(order.total_amount || "0").toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -961,11 +1133,11 @@ export default function OrderDetailPage() {
               {order.vendor.restaurant_image && (
                 <div className="flex justify-center mb-4">
                   <img
-                    src={order.vendor.restaurant_image}
+                    src={getImageUrl(order.vendor.restaurant_image) || DEFAULT_VENDOR_IMAGE}
                     alt={order.vendor.restaurant_name}
                     className="w-24 h-24 rounded-xl object-cover border-2 border-gray-200 shadow-sm"
                     onError={(e) => {
-                      e.currentTarget.src = DEFAULT_IMAGE;
+                      e.currentTarget.src = DEFAULT_VENDOR_IMAGE;
                     }}
                   />
                 </div>

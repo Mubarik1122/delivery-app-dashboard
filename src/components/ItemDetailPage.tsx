@@ -15,8 +15,9 @@ import {
   Info,
   PlusCircle,
   Ruler,
+  Sparkles,
 } from "lucide-react";
-import { Item, Category, Addon, ItemSize, apiService } from "../services/api";
+import { Item, Category, Addon, ItemSize, Flavor, apiService } from "../services/api";
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +26,7 @@ export default function ItemDetailPage() {
   const [itemCategories, setItemCategories] = useState<Category[]>([]);
   const [itemAddons, setItemAddons] = useState<Addon[]>([]);
   const [itemSizes, setItemSizes] = useState<ItemSize[]>([]);
+  const [itemFlavors, setItemFlavors] = useState<Flavor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -156,6 +158,17 @@ export default function ItemDetailPage() {
           }));
           setItemSizes(mappedSizes);
         }
+
+        // Extract flavors from item response
+        if (Array.isArray(itemData.flavors)) {
+          const mappedFlavors = itemData.flavors.map((flavor: any) => ({
+            id: flavor.id ? Number(flavor.id) : undefined,
+            flavorName: flavor.flavor_name || flavor.flavorName || flavor.name || "",
+            description: flavor.description || "",
+            isActive: flavor.is_active !== undefined ? flavor.is_active : (flavor.isActive !== undefined ? flavor.isActive : true),
+          }));
+          setItemFlavors(mappedFlavors);
+        }
       } else {
         setError(response.errorMessage || "Failed to load item");
       }
@@ -176,7 +189,7 @@ export default function ItemDetailPage() {
   const handleEdit = () => {
     // Navigate to items page and trigger edit mode
     if (item) {
-      navigate("/items/update", { state: { editItem: item } });
+      navigate(`/items/update?id=${item.id}`, { state: { itemId: item.id, editItem: item } });
     }
   };
 
@@ -520,112 +533,150 @@ export default function ItemDetailPage() {
         )}
       </div>
 
-      {/* Addons Section */}
-      {itemAddons.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="bg-purple-50 p-2 rounded-lg">
-                <PlusCircle className="w-6 h-6 text-purple-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Available Addons
-              </h2>
-            </div>
-            <span className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 px-4 py-2 rounded-full text-sm font-semibold border border-purple-300">
-              {itemAddons.length} {itemAddons.length === 1 ? 'addon' : 'addons'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {itemAddons.map((addon) => (
-              <div
-                key={addon.id}
-                className="group bg-gradient-to-br from-white to-purple-50 rounded-xl border-2 border-purple-200 p-6 hover:shadow-lg hover:border-purple-400 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="bg-purple-100 p-2 rounded-lg">
-                        <PlusCircle className="w-5 h-5 text-purple-600" />
+      {/* Addons, Sizes & Flavors Combined Section */}
+      {(itemAddons.length > 0 || itemSizes.length > 0 || itemFlavors.length > 0) && (
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Addons Section */}
+            {itemAddons.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-purple-50 p-2 rounded-lg">
+                      <PlusCircle className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">Available Addons</h3>
+                  </div>
+                  <span className="bg-purple-50 text-purple-700 px-2.5 py-1 rounded-md text-xs font-medium">
+                    {itemAddons.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {itemAddons.map((addon) => (
+                    <div
+                      key={addon.id}
+                      className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-purple-200 hover:bg-purple-50/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="bg-purple-100 p-2 rounded-lg flex-shrink-0">
+                          <PlusCircle className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-gray-800 text-sm truncate">
+                              {addon.addonName}
+                            </h4>
+                            {addon.isActive && (
+                              <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          {addon.description && (
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              {addon.description}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <h4 className="font-bold text-gray-800 text-lg">
-                        {addon.addonName}
-                      </h4>
+                      <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-md border border-green-200 ml-3 flex-shrink-0">
+                        <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                        <span className="text-sm font-semibold text-green-700">
+                          {typeof addon.price === 'number' ? addon.price.toFixed(2) : parseFloat(String(addon.price || 0)).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                      {addon.description || "No description"}
-                    </p>
-                  </div>
-                  {addon.isActive && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold bg-green-100 text-green-800 border border-green-300">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Active
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t-2 border-purple-200">
-                  <span className="text-xs text-gray-500 font-medium">Price</span>
-                  <div className="flex items-center gap-1 bg-gradient-to-r from-green-50 to-emerald-50 px-3 py-1.5 rounded-lg border border-green-200">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <span className="text-lg font-bold text-green-700">
-                      {typeof addon.price === 'number' ? addon.price.toFixed(2) : parseFloat(String(addon.price || 0)).toFixed(2)}
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
-      {/* Sizes Section */}
-      {itemSizes.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-50 p-2 rounded-lg">
-                <Ruler className="w-6 h-6 text-blue-600" />
+            {/* Sizes Section */}
+            {itemSizes.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-blue-50 p-2 rounded-lg">
+                      <Ruler className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">Available Sizes</h3>
+                  </div>
+                  <span className="bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md text-xs font-medium">
+                    {itemSizes.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {itemSizes.map((size, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 hover:bg-blue-50/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <div className="bg-blue-100 p-2 rounded-lg flex-shrink-0">
+                          <Ruler className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-800 text-sm">
+                            {size.sizeName}
+                          </h4>
+                          <p className="text-xs text-gray-500">Size Option</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-md border border-green-200 ml-3 flex-shrink-0">
+                        <DollarSign className="w-3.5 h-3.5 text-green-600" />
+                        <span className="text-sm font-semibold text-green-700">
+                          {typeof size.price === 'number' ? size.price.toFixed(2) : parseFloat(String(size.price || 0)).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Available Sizes
-              </h2>
-            </div>
-            <span className="bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold border border-blue-300">
-              {itemSizes.length} {itemSizes.length === 1 ? 'size' : 'sizes'}
-            </span>
-          </div>
+            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {itemSizes.map((size, index) => (
-              <div
-                key={index}
-                className="group bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 hover:shadow-lg hover:border-blue-400 transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 p-3 rounded-xl">
-                      <Ruler className="w-6 h-6 text-blue-600" />
+            {/* Flavors Section */}
+            {itemFlavors.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                  <div className="flex items-center space-x-2">
+                    <div className="bg-pink-50 p-2 rounded-lg">
+                      <Sparkles className="w-5 h-5 text-pink-600" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-gray-800 text-xl mb-1">
-                        {size.sizeName}
-                      </h4>
-                      <p className="text-xs text-gray-500">Size Option</p>
-                    </div>
+                    <h3 className="text-base font-semibold text-gray-800">Available Flavors</h3>
                   </div>
+                  <span className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-md text-xs font-medium">
+                    {itemFlavors.length}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t-2 border-blue-200">
-                  <span className="text-xs text-gray-500 font-medium">Price</span>
-                  <div className="flex items-center gap-1 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
-                    <DollarSign className="w-5 h-5 text-green-600" />
-                    <span className="text-xl font-bold text-green-700">
-                      {typeof size.price === 'number' ? size.price.toFixed(2) : parseFloat(String(size.price || 0)).toFixed(2)}
-                    </span>
-                  </div>
+                <div className="space-y-2.5">
+                  {itemFlavors.map((flavor, index) => (
+                    <div
+                      key={flavor.id || index}
+                      className="flex items-center justify-between p-3.5 bg-gray-50 rounded-lg border border-gray-200 hover:border-pink-200 hover:bg-pink-50/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="bg-pink-100 p-2 rounded-lg flex-shrink-0">
+                          <Sparkles className="w-4 h-4 text-pink-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-gray-800 text-sm truncate">
+                              {flavor.flavorName}
+                            </h4>
+                            {flavor.isActive && (
+                              <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          {flavor.description && (
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                              {flavor.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}

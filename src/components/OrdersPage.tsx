@@ -588,9 +588,13 @@ export default function OrdersPage({ orderType }: OrdersPageProps) {
                       {index + 1}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900 group-hover:text-red-600 transition-colors">
+                      <button
+                        onClick={() => navigate(`/order/${order.orderId}`)}
+                        className="text-sm font-semibold text-gray-900 group-hover:text-red-600 hover:text-red-600 transition-colors cursor-pointer hover:underline"
+                        title="Click to view order details"
+                      >
                         {order.orderId}
-                      </div>
+                      </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>

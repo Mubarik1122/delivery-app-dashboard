@@ -14,6 +14,8 @@ interface HeaderProps {
   onProfileAction: (action: "profile" | "logout" | "login") => void;
   userRole: "admin" | "vendor";
   userName?: string; // added prop for user name
+  firstName?: string; // First name to display instead of "Vendor"
+  restaurantImage?: string; // Restaurant image to display as avatar
 }
 
 // ...existing code...
@@ -21,10 +23,32 @@ export default function Header({
   onProfileAction,
   userRole,
   userName,
+  firstName,
+  restaurantImage,
 }: HeaderProps) {
   const [showProfileDropdown, setShowProfileDropdown] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
 
-  // choose avatar gradient based on role
+  // Reset image error when restaurantImage changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [restaurantImage]);
+
+  // Image base URL from environment variable
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return "";
+    const trimmedPath = imagePath.trim();
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
+  // choose avatar gradient based on role (fallback if no image)
   const avatarGradient =
     userRole === "admin"
       ? "from-red-500 to-red-600"
@@ -69,15 +93,24 @@ export default function Header({
               onClick={() => setShowProfileDropdown(!showProfileDropdown)}
               className="flex items-center space-x-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <div
-                className={`w-8 h-8 bg-gradient-to-br ${avatarGradient} rounded-full flex items-center justify-center shadow-sm`}
-              >
-                <User className="w-4 h-4 text-white" />
-              </div>
+              {restaurantImage && !imageError ? (
+                <img
+                  src={getImageUrl(restaurantImage)}
+                  alt={firstName || userName || userRole}
+                  className="w-8 h-8 rounded-full object-cover border-2 border-gray-200 shadow-sm"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div
+                  className={`w-8 h-8 bg-gradient-to-br ${avatarGradient} rounded-full flex items-center justify-center shadow-sm`}
+                >
+                  <User className="w-4 h-4 text-white" />
+                </div>
+              )}
               <div className="hidden lg:block">
                 <div>
                   <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
-                    {userName ?? userRole}
+                    {firstName || userName || userRole}
                   </span>
                   <div className="text-xs text-gray-500 capitalize">
                     {userRole}

@@ -40,6 +40,7 @@ import CategoryDetailPage from "./components/CategoryDetailPage";
 import ItemsPage from "./components/ItemsPage";
 import ItemDetailPage from "./components/ItemDetailPage";
 import AddonsPage from "./components/AddonsPage";
+import FlavorsPage from "./components/FlavorsPage";
 import {
   Clock,
   CheckCircle,
@@ -61,6 +62,7 @@ import {
 } from "lucide-react";
 import DeleteConfirmationPage from "./components/DeleteConfirmationPage";
 import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
+import LandingPage from "./components/LandingPage";
 
 function App() {
   const navigate = useNavigate();
@@ -76,6 +78,40 @@ function App() {
     (localStorage.getItem("user_role") as "admin" | "vendor") || "admin"
   );
 
+  // User profile data for header
+  const [userFirstName, setUserFirstName] = useState<string | undefined>(undefined);
+  const [userRestaurantImage, setUserRestaurantImage] = useState<string | undefined>(undefined);
+  const [userIsFood, setUserIsFood] = useState<boolean | undefined>(undefined);
+
+  // Fetch user profile data when authenticated (skip if on profile page to avoid duplicate calls)
+  React.useEffect(() => {
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem("auth_token");
+      if (!token) return;
+
+      // Skip API call if we're on profile page (ProfilePage will fetch it)
+      if (location.pathname === '/profile') return;
+
+      try {
+        const { apiService } = await import('./services/api');
+        const response = await apiService.getProfileData();
+        
+        if (response.errorCode === 0 && response.data) {
+          const userData = Array.isArray(response.data) ? response.data[0] : response.data;
+          setUserFirstName(userData.first_name);
+          setUserRestaurantImage(userData.restaurant_image);
+          setUserIsFood(userData.is_food === true);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchUserProfile();
+    }
+  }, [isAuthenticated, location.pathname]);
+
   // Check for existing authentication and user role on app load
   React.useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -89,11 +125,13 @@ function App() {
   const handleLogin = () => {
     setIsAuthenticated(true);
     setAuthMode("login");
+    navigate("/dashboard");
   };
 
   const handleSignup = () => {
     setIsAuthenticated(true);
     setAuthMode("login");
+    navigate("/dashboard");
   };
 
   const handleOTPVerified = (token: string, user: any) => {
@@ -109,6 +147,7 @@ function App() {
     }
     setIsAuthenticated(true);
     setAuthMode("login");
+    navigate("/dashboard");
   };
 
   const handleRoleSelect = (role: "admin" | "vendor") => {
@@ -121,6 +160,8 @@ function App() {
     localStorage.removeItem("user_role");
     setIsAuthenticated(false);
     setUserRole("admin");
+    setUserFirstName(undefined);
+    setUserRestaurantImage(undefined);
     setAuthMode("login");
     navigate("/dashboard");
   };
@@ -140,8 +181,28 @@ function App() {
     }
   };
 
-  // Show authentication pages if not authenticated
-  if (!isAuthenticated) {
+  // Show landing page if on root route and not authenticated
+  if (location.pathname === "/" && !isAuthenticated) {
+    return <LandingPage />;
+  }
+
+  // Show privacy policy page (public access)
+  if (location.pathname === "/privacy-policy") {
+    return <PrivacyPolicyPage />;
+  }
+
+  // Redirect /login to /admin-access
+  if (location.pathname === "/login") {
+    return <Navigate to="/admin-access" replace />;
+  }
+
+  // If authenticated and on root or admin-access, redirect to dashboard
+  if (isAuthenticated && (location.pathname === "/" || location.pathname === "/admin-access")) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Show authentication pages if not authenticated and on admin-access route
+  if (!isAuthenticated && location.pathname === "/admin-access") {
     switch (authMode) {
       case "login":
         return (
@@ -190,6 +251,11 @@ function App() {
     }
   }
 
+  // If not authenticated and not on allowed routes, redirect to landing
+  if (!isAuthenticated && location.pathname !== "/admin-access" && location.pathname !== "/" && location.pathname !== "/privacy-policy") {
+    return <Navigate to="/" replace />;
+  }
+
   // Main authenticated app with routing
   return (
     <div className="flex h-screen bg-gray-50">
@@ -197,13 +263,17 @@ function App() {
         activeSection={location.pathname.slice(1) || "dashboard"}
         onSectionChange={(section) => navigate(`/${section}`)}
         userRole={userRole}
+        isFood={userIsFood}
       />
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        <Header onProfileAction={handleProfileAction} userRole={userRole} />
+        <Header 
+          onProfileAction={handleProfileAction} 
+          userRole={userRole}
+          firstName={userFirstName}
+          restaurantImage={userRestaurantImage}
+        />
         <main className="flex-1 overflow-auto p-4 lg:p-6">
           <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route
               path="/dashboard"
@@ -222,6 +292,7 @@ function App() {
             <Route path="/items/update" element={<ItemsPage />} />
             <Route path="/items/:id" element={<ItemDetailPage />} />
             <Route path="/addons" element={<AddonsPage />} />
+            <Route path="/flavors" element={<FlavorsPage />} />
             <Route path="/categories/new" element={<CategoriesPage />} />
             <Route path="/categories/update" element={<CategoriesPage />} />
             <Route
