@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import {
   Search,
@@ -25,6 +25,8 @@ import {
   DollarSign,
   Info,
   AlertCircle,
+  Sparkles,
+  CheckCircle,
 } from "lucide-react";
 import {
   apiService,
@@ -34,11 +36,13 @@ import {
   Category,
   Addon,
   ItemSize,
+  Flavor,
 } from "../services/api";
 
 export default function ItemsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Item[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [addons, setAddons] = useState<Addon[]>([]);
@@ -63,6 +67,8 @@ export default function ItemsPage() {
     useState<string>("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showAddonDropdown, setShowAddonDropdown] = useState(false);
+  const [showFlavorDropdown, setShowFlavorDropdown] = useState(false);
+  const [flavors, setFlavors] = useState<Flavor[]>([]);
   const [formData, setFormData] = useState({
     itemName: "",
     shortDescription: "",
@@ -71,6 +77,7 @@ export default function ItemsPage() {
     backgroundImageUrl: "",
     categoryIds: [] as number[],
     addonIds: [] as number[],
+    flavorIds: [] as number[],
     sizes: [] as ItemSize[],
     quantity: 0,
     price: 0,
@@ -88,31 +95,201 @@ export default function ItemsPage() {
   const isAddMode = location.pathname === "/items/new";
   const isEditMode = location.pathname === "/items/update";
 
-  useEffect(() => {
-    // Handle edit mode from location state
-    if (isEditMode && location.state?.editItem) {
-      const item = location.state.editItem;
-      setFormData({
-        itemName: item.itemName,
-        shortDescription: item.shortDescription,
-        longDescription: item.longDescription,
-        coverImageUrl: item.coverImageUrl,
-        backgroundImageUrl: item.backgroundImageUrl,
-        categoryIds: item.categoryIds,
-        addonIds: item.addonIds || [],
-        sizes: item.sizes || [],
-        quantity: Number(item.quantity) || 0,
-        price: parseFloat(String(item.price)) || 0,
+  // Load item data for edit mode
+  const loadItemForEdit = async (itemId: number) => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await apiService.getItemById(itemId);
+
+      if (response.errorCode === 0 && response.data && Array.isArray(response.data.items) && response.data.items.length > 0) {
+        const itemData = response.data.items[0];
+        
+        // Map item data
+        const mappedItem: Item = {
+          id: Number(itemData.id),
+          itemName: itemData.item_name || itemData.itemName,
+          shortDescription: itemData.short_description || itemData.shortDescription || "",
+          longDescription: itemData.long_description || itemData.longDescription || "",
+          coverImageUrl: getImageUrl(itemData.cover_image_url || itemData.coverImageUrl),
+          backgroundImageUrl: getImageUrl(itemData.background_image_url || itemData.backgroundImageUrl),
+          categoryIds: Array.isArray(itemData.categories)
+            ? itemData.categories.map((cat: any) => Number(cat.id))
+            : [],
+          addonIds: Array.isArray(itemData.addons)
+            ? itemData.addons.map((addon: any) => Number(addon.id || addon))
+            : [],
+          flavorIds: Array.isArray(itemData.flavors)
+            ? itemData.flavors.map((flavor: any) => Number(flavor.id || flavor))
+            : [],
+          sizes: Array.isArray(itemData.sizes)
+            ? itemData.sizes.map((size: any) => ({
+                sizeName: size.size_name || size.sizeName || "",
+                price: typeof size.price === 'string' ? parseFloat(size.price) : (typeof size.price === 'number' ? size.price : 0),
+              }))
+            : [],
+          quantity: Number(itemData.quantity) || 0,
+          price:
+            itemData.unit_price !== undefined && itemData.unit_price !== null
+              ? parseFloat(String(itemData.unit_price)) || 0
+              : itemData.price !== undefined && itemData.price !== null
+              ? parseFloat(String(itemData.price)) || 0
+              : 0,
+          createdAt: itemData.created_at || itemData.createdAt,
+          updatedAt: itemData.updated_at || itemData.updatedAt,
+          vendorId: itemData.vendor_id || itemData.vendorId,
+        };
+
+        // Extract categories from item response and set them
+        if (Array.isArray(itemData.categories)) {
+          const mappedCategories = itemData.categories.map((cat: any) => ({
+            id: Number(cat.id),
+            categoryName: cat.category_name || cat.categoryName,
+            shortDescription: cat.short_description || cat.shortDescription || "",
+            longDescription: cat.long_description || cat.longDescription || "",
+            isSubCategory: cat.is_sub_category !== undefined ? cat.is_sub_category : false,
+            coverImage: getImageUrl(cat.cover_image || cat.coverImage),
+            parentCategoryIds: Array.isArray(cat.parent_categories)
+              ? cat.parent_categories.map((p: any) => Number(p.id))
+              : [],
+          }));
+          setCategories(mappedCategories);
+        }
+
+        // Extract addons from item response and add them to addons state
+        // This ensures selected addons are visible in the dropdown even if they're inactive
+        if (Array.isArray(itemData.addons)) {
+          const mappedAddonsFromItem = itemData.addons.map((addon: any) => ({
+            id: Number(addon.id || addon),
+            addonName: addon.addon_name || addon.addonName || "",
+            description: addon.description || "",
+            price: typeof addon.price === 'string' ? parseFloat(addon.price) : (typeof addon.price === 'number' ? addon.price : 0),
+            isActive: addon.is_active !== undefined ? addon.is_active : (addon.isActive !== undefined ? addon.isActive : true),
+            createdAt: addon.created_at || addon.createdAt,
+            updatedAt: addon.updated_at || addon.updatedAt,
+            userId: addon.user_id || addon.userId,
+          }));
+          
+          // Merge with existing addons, avoiding duplicates
+          setAddons((prevAddons) => {
+            const existingIds = new Set(prevAddons.map(a => a.id));
+            const newAddons = mappedAddonsFromItem.filter(a => !existingIds.has(a.id));
+            return [...prevAddons, ...newAddons];
+          });
+        }
+
+        // Extract flavors from item response and merge with existing flavors
+        // This ensures selected flavors are visible in the dropdown even if they're inactive
+        if (Array.isArray(itemData.flavors)) {
+          const mappedFlavorsFromItem = itemData.flavors.map((flavor: any) => ({
+            id: flavor.id ? Number(flavor.id) : undefined,
+            flavorName: flavor.flavor_name || flavor.flavorName || flavor.name || "",
+            description: flavor.description || "",
+            imageUrl: flavor.image_url || flavor.imageUrl,
+            isActive: flavor.is_active !== undefined ? flavor.is_active : (flavor.isActive !== undefined ? flavor.isActive : true),
+          }));
+          
+          // Merge with existing flavors (from loadFlavors) to avoid duplicates
+          setFlavors((prevFlavors) => {
+            const merged = [...prevFlavors];
+            mappedFlavorsFromItem.forEach((itemFlavor) => {
+              if (itemFlavor.id && !merged.find((f) => f.id === itemFlavor.id)) {
+                merged.push(itemFlavor);
+              }
+            });
+            return merged;
+          });
+        }
+
+        // Populate form with item data
+        // Store full URLs in formData for display in input fields
+        // When submitting, we'll convert them back to relative paths if needed
+        const originalCoverImage = itemData.cover_image_url || itemData.coverImageUrl || "";
+        const originalBackgroundImage = itemData.background_image_url || itemData.backgroundImageUrl || "";
+        
+        // Convert relative paths to full URLs for display in input fields
+        const coverImageForDisplay = originalCoverImage 
+          ? (originalCoverImage.startsWith('http://') || originalCoverImage.startsWith('https://') 
+              ? originalCoverImage 
+              : getImageUrl(originalCoverImage))
+          : "";
+        const backgroundImageForDisplay = originalBackgroundImage
+          ? (originalBackgroundImage.startsWith('http://') || originalBackgroundImage.startsWith('https://')
+              ? originalBackgroundImage
+              : getImageUrl(originalBackgroundImage))
+          : "";
+        
+        setFormData({
+          itemName: mappedItem.itemName,
+          shortDescription: mappedItem.shortDescription,
+          longDescription: mappedItem.longDescription,
+          coverImageUrl: coverImageForDisplay,
+          backgroundImageUrl: backgroundImageForDisplay,
+          categoryIds: mappedItem.categoryIds,
+          addonIds: mappedItem.addonIds || [],
+          flavorIds: (mappedItem as any).flavorIds || [],
+          sizes: mappedItem.sizes || [],
+          quantity: mappedItem.quantity || 0,
+          price: mappedItem.price || 0,
+        });
+        // Use full URLs for preview display
+        setCoverImagePreview(mappedItem.coverImageUrl);
+        setBackgroundImagePreview(mappedItem.backgroundImageUrl);
+        setEditingItem(mappedItem);
+        setShowAddForm(true);
+      } else {
+        setError(response.errorMessage || "Failed to load item");
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.errorMessage || "Failed to load item",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading item for edit:", error);
+      setError("Failed to load item");
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error instanceof Error ? error.message : "Failed to load item",
       });
-      setCoverImagePreview(item.coverImageUrl);
-      setBackgroundImagePreview(item.backgroundImageUrl);
-      setEditingItem(item);
-      setShowAddForm(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    // Handle edit mode - get ID from URL params or location state
+    if (isEditMode) {
+      const itemId = searchParams.get('id') || location.state?.itemId || location.state?.editItem?.id;
+      if (itemId) {
+        loadItemForEdit(Number(itemId));
+      } else if (location.state?.editItem) {
+        // Fallback to old method if ID not available
+        const item = location.state.editItem;
+        setFormData({
+          itemName: item.itemName,
+          shortDescription: item.shortDescription,
+          longDescription: item.longDescription,
+          coverImageUrl: item.coverImageUrl,
+          backgroundImageUrl: item.backgroundImageUrl,
+          categoryIds: item.categoryIds,
+          addonIds: item.addonIds || [],
+          flavorIds: (item as any).flavorIds || [],
+          sizes: item.sizes || [],
+          quantity: Number(item.quantity) || 0,
+          price: parseFloat(String(item.price)) || 0,
+        });
+        setCoverImagePreview(item.coverImageUrl);
+        setBackgroundImagePreview(item.backgroundImageUrl);
+        setEditingItem(item);
+        setShowAddForm(true);
+      }
     } else if (isAddMode) {
       resetForm();
       setShowAddForm(true);
     }
-  }, [location, isAddMode, isEditMode]);
+  }, [location, isAddMode, isEditMode, searchParams]);
 
   // Default demo images
   const DEFAULT_COVER_IMAGE =
@@ -143,10 +320,16 @@ export default function ItemsPage() {
   };
 
   useEffect(() => {
-    loadItems();
-    loadCategories();
+    // Only load items and categories if NOT in edit mode
+    // In edit mode, item data and categories will be loaded from getItemById
+    if (!isEditMode) {
+      loadItems();
+      loadCategories();
+    }
+    // Always load addons and flavors as they're needed for the form
     loadAddons();
-  }, []);
+    loadFlavors();
+  }, [isEditMode]);
 
   const loadItems = async () => {
     try {
@@ -260,6 +443,30 @@ export default function ItemsPage() {
     }
   };
 
+  const loadFlavors = async () => {
+    try {
+      const response = await apiService.getAllFlavors();
+      if (response.errorCode === 0 && response.data) {
+        // Map snake_case API response to camelCase and filter only active flavors
+        const mapped = response.data
+          .map((flavor: any) => ({
+            id: flavor.id,
+            flavorName: flavor.flavor_name || flavor.flavorName,
+            description: flavor.description || "",
+            imageUrl: flavor.image_url || flavor.imageUrl,
+            isActive: flavor.is_active !== undefined ? flavor.is_active : flavor.isActive,
+            createdAt: flavor.created_at || flavor.createdAt,
+            updatedAt: flavor.updated_at || flavor.updatedAt,
+            userId: flavor.user_id || flavor.userId,
+          }))
+          .filter((flavor: Flavor) => flavor.isActive); // Only active flavors
+        setFlavors(mapped);
+      }
+    } catch (error) {
+      console.error("Error loading flavors:", error);
+    }
+  };
+
   const categoryOptions = ["All", ...categories.map((cat) => cat.categoryName)];
 
   const filteredItems = items.filter((item) => {
@@ -334,6 +541,7 @@ export default function ItemsPage() {
       backgroundImageUrl: "",
       categoryIds: [],
       addonIds: [],
+      flavorIds: [],
       sizes: [],
       quantity: 0,
       price: 0,
@@ -392,7 +600,7 @@ export default function ItemsPage() {
   };
 
   const handleEditItem = (item: Item) => {
-    navigate("/items/update", { state: { editItem: item } });
+    navigate(`/items/update?id=${item.id}`, { state: { itemId: item.id, editItem: item } });
   };
 
   const handleViewItem = (item: Item) => {
@@ -411,10 +619,46 @@ export default function ItemsPage() {
         return;
       }
 
-      const finalCoverImage =
-        formData.coverImageUrl.trim() || DEFAULT_COVER_IMAGE;
-      const finalBackgroundImage =
-        formData.backgroundImageUrl.trim() || DEFAULT_BACKGROUND_IMAGE;
+      // Handle image URLs:
+      // 1. If it's a base64 data URL (from file upload), send it as is
+      // 2. If it's a relative path (starts with /), send it as is (existing image on server - API should not download)
+      // 3. If it's a full URL from our server, convert to relative path (remove base URL)
+      // 4. If it's an external URL (http:// or https://), send it as is (API will try to download)
+      // 5. If it's empty, send undefined (let API handle defaults)
+      const getImageValue = (imageUrl: string, defaultImage: string): string | undefined => {
+        const trimmed = imageUrl.trim();
+        if (!trimmed) {
+          return undefined; // Don't send empty strings, let API handle defaults
+        }
+        
+        // If it's a base64 data URL, send it as is
+        if (trimmed.startsWith('data:')) {
+          return trimmed;
+        }
+        
+        // If it's a relative path (starts with /), send it as is (already on server)
+        if (trimmed.startsWith('/')) {
+          return trimmed;
+        }
+        
+        // If it's a full URL from our server, convert to relative path
+        const baseUrl = IMAGE_BASE_URL;
+        if (trimmed.startsWith(baseUrl)) {
+          const relativePath = trimmed.substring(baseUrl.length);
+          return relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+        }
+        
+        // If it's an external URL (http:// or https://), send it as is
+        if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+          return trimmed;
+        }
+        
+        // Otherwise, use default (but only for new items, not updates)
+        return editingItem ? undefined : defaultImage;
+      };
+
+      const finalCoverImage = getImageValue(formData.coverImageUrl, DEFAULT_COVER_IMAGE);
+      const finalBackgroundImage = getImageValue(formData.backgroundImageUrl, DEFAULT_BACKGROUND_IMAGE);
 
       const itemData: CreateUpdateItemRequest = {
         ...(editingItem && { id: editingItem.id }),
@@ -425,6 +669,7 @@ export default function ItemsPage() {
         backgroundImageUrl: finalBackgroundImage,
         categoryIds: formData.categoryIds,
         addonIds: formData.addonIds.length > 0 ? formData.addonIds : undefined,
+        flavorIds: formData.flavorIds.length > 0 ? formData.flavorIds : undefined,
         sizes: formData.sizes.length > 0 ? formData.sizes : undefined,
         quantity: Number(formData.quantity),
         price: parseFloat(String(formData.price)),
@@ -527,6 +772,13 @@ export default function ItemsPage() {
       ? formData.addonIds.filter((id) => id !== addonId)
       : [...formData.addonIds, addonId];
     handleInputChange("addonIds", newAddonIds);
+  };
+
+  const handleFlavorToggle = (flavorId: number) => {
+    const newFlavorIds = formData.flavorIds.includes(flavorId)
+      ? formData.flavorIds.filter((id) => id !== flavorId)
+      : [...formData.flavorIds, flavorId];
+    handleInputChange("flavorIds", newFlavorIds);
   };
 
   const handleAddSize = () => {
@@ -1117,6 +1369,186 @@ export default function ItemsPage() {
               </div>
             </div>
 
+            {/* Flavors Selection */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+              <div className="mb-6 pb-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">
+                  Flavors (Optional)
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Select flavors available for this item
+                </p>
+              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Flavors
+              </label>
+              <div className="relative">
+                {/* Multi-select dropdown trigger */}
+                <div
+                  onClick={() => setShowFlavorDropdown(!showFlavorDropdown)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer bg-white min-h-[42px] flex items-center justify-between hover:border-gray-400 transition-all"
+                >
+                  <div className="flex-1">
+                    {formData.flavorIds.length === 0 ? (
+                      <span className="text-gray-500">
+                        Select flavors (optional)...
+                      </span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {formData.flavorIds.slice(0, 3).map((flavorId) => {
+                          const flavor = flavors.find(
+                            (f) => f.id === flavorId
+                          );
+                          return flavor ? (
+                            <span
+                              key={flavorId}
+                              className="inline-flex items-center gap-1 px-2 py-1 bg-pink-100 text-pink-800 rounded-full text-xs"
+                            >
+                              {flavor.flavorName}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFlavorToggle(flavorId);
+                                }}
+                                className="ml-1 hover:bg-pink-200 rounded-full p-0.5"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ) : null;
+                        })}
+                        {formData.flavorIds.length > 3 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                            +{formData.flavorIds.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {formData.flavorIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleInputChange("flavorIds", []);
+                        }}
+                        className="text-gray-400 hover:text-gray-600 p-1"
+                        title="Clear all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div
+                      className={`transform transition-transform ${
+                        showFlavorDropdown ? "rotate-180" : ""
+                      }`}
+                    >
+                      <svg
+                        className="w-4 h-4 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dropdown menu */}
+                {showFlavorDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                    {flavors.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500">
+                        No flavors available. Flavors will appear here when available in the item data.
+                      </div>
+                    ) : (
+                      <div className="p-2">
+                        {/* Select All / Deselect All */}
+                        <div className="flex items-center justify-between p-2 border-b border-gray-100 mb-2">
+                          <span className="text-sm font-medium text-gray-700">
+                            {formData.flavorIds.length} of {flavors.filter(f => f.id).length}{" "}
+                            selected
+                          </span>
+                          <div className="flex space-x-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleInputChange(
+                                  "flavorIds",
+                                  flavors.filter(f => f.id).map((f) => f.id as number)
+                                )
+                              }
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Select All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleInputChange("flavorIds", [])
+                              }
+                              className="text-xs text-red-600 hover:text-red-800"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Flavor options */}
+                        <div className="space-y-1">
+                          {flavors.map((flavor) => (
+                            <label
+                              key={flavor.id}
+                              className="flex items-center space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={flavor.id ? formData.flavorIds.includes(flavor.id) : false}
+                                onChange={() => flavor.id && handleFlavorToggle(flavor.id)}
+                                className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                disabled={isSubmitting || !flavor.id}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium text-gray-800">
+                                    {flavor.flavorName}
+                                  </span>
+                                  {flavor.isActive && (
+                                    <CheckCircle className="w-3.5 h-3.5 text-green-600 flex-shrink-0 ml-2" />
+                                  )}
+                                </div>
+                                {flavor.description && (
+                                  <p className="text-xs text-gray-500 truncate mt-0.5">
+                                    {flavor.description}
+                                  </p>
+                                )}
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Click outside to close dropdown */}
+                {showFlavorDropdown && (
+                  <div
+                    className="fixed inset-0 z-0"
+                    onClick={() => setShowFlavorDropdown(false)}
+                  />
+                )}
+              </div>
+            </div>
+
             {/* Sizes Section */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
               <div className="mb-6 pb-4 border-b border-gray-200">
@@ -1450,11 +1882,16 @@ export default function ItemsPage() {
                     Background Image Preview
                   </label>
                   <img
-                    src={getImageUrl(backgroundImagePreview || formData.backgroundImageUrl)}
+                    src={backgroundImagePreview || getImageUrl(formData.backgroundImageUrl)}
                     alt="Background Preview"
                     className="w-full max-w-md h-40 object-cover rounded-lg border border-gray-200"
                     onError={(e) => {
-                      e.currentTarget.src = DEFAULT_BACKGROUND_IMAGE;
+                      // If preview fails, try the formData URL, then default
+                      if (backgroundImagePreview && e.currentTarget.src !== getImageUrl(formData.backgroundImageUrl)) {
+                        e.currentTarget.src = getImageUrl(formData.backgroundImageUrl);
+                      } else {
+                        e.currentTarget.src = DEFAULT_BACKGROUND_IMAGE;
+                      }
                     }}
                   />
                 </div>

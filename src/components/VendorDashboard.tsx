@@ -9,7 +9,6 @@ import {
   CheckCircle,
   RefreshCw,
   Users,
-  Star,
   Plus,
   ArrowRight,
   Store,
@@ -68,7 +67,6 @@ export default function VendorDashboard() {
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [mostRatedProducts, setMostRatedProducts] = useState<any[]>([]);
   const [topCustomers, setTopCustomers] = useState<any[]>([]);
-  const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -88,7 +86,21 @@ export default function VendorDashboard() {
     }
   };
 
-  // Fetch vendor dashboard data
+  // Image base URL from environment variable
+  const IMAGE_BASE_URL = ((import.meta.env.VITE_IMAGE_BASE_URL as string) || "https://groceryapp-production-d3fc.up.railway.app").trim().replace(/\/+$/, "");
+
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath: string | undefined | null): string => {
+    if (!imagePath) return "";
+    const trimmedPath = imagePath.trim();
+    if (trimmedPath.startsWith("http://") || trimmedPath.startsWith("https://")) {
+      return trimmedPath;
+    }
+    const cleanPath = trimmedPath.startsWith("/") ? trimmedPath.substring(1) : trimmedPath;
+    return `${IMAGE_BASE_URL}/${cleanPath}`;
+  };
+
+  // Fetch vendor dashboard data using new APIs
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -102,130 +114,96 @@ export default function VendorDashboard() {
 
       setVendorId(currentVendorId);
 
-      // Fetch vendor-specific data
-      const [itemsResponse, ordersResponse] = await Promise.all([
-        apiService.getAllItems(),
-        apiService.getAllOrders({
-          start_date: getStartOfMonth(),
-          end_date: getEndOfMonth(),
-          page: 1,
-          limit: 1000,
-        }),
+      // Fetch data from new vendor dashboard and analytics APIs
+      const [dashboardResponse, analyticsResponse] = await Promise.all([
+        apiService.getVendorDashboard(),
+        apiService.getVendorAnalytics(),
       ]);
 
-      // Process items data - get only items belonging to this vendor
-      const allItems = itemsResponse.data?.items || [];
-      setItems(allItems);
-      const vendorItems = allItems.filter((item: any) => {
-        return true; // Show all items for now
-      });
-      const totalProducts = vendorItems.length;
-
-      // Process orders data - use the correct structure from API
-      let orders: any[] = [];
-      if (
-        ordersResponse.data?.data?.orders &&
-        Array.isArray(ordersResponse.data.data.orders)
-      ) {
-        orders = ordersResponse.data.data.orders;
-      } else if (
-        ordersResponse.data?.orders &&
-        Array.isArray(ordersResponse.data.orders)
-      ) {
-        orders = ordersResponse.data.orders;
+      if (dashboardResponse.errorCode !== 0 || !dashboardResponse.data) {
+        throw new Error(dashboardResponse.errorMessage || "Failed to load dashboard data");
       }
 
-      const totalOrders = orders.length;
+      if (analyticsResponse.errorCode !== 0 || !analyticsResponse.data) {
+        throw new Error(analyticsResponse.errorMessage || "Failed to load analytics data");
+      }
 
-      // Count orders by status
-      const pendingOrders = orders.filter(
-        (order: any) => order.order_status?.toLowerCase() === "pending"
-      ).length;
+      const dashboardData = dashboardResponse.data;
+      const analyticsData = analyticsResponse.data;
 
-      const completedOrders = orders.filter(
-        (order: any) =>
-          order.order_status?.toLowerCase() === "delivered" ||
-          order.order_status?.toLowerCase() === "completed"
-      ).length;
-
-      // Calculate revenue from orders
-      const revenue = orders.reduce((total: number, order: any) => {
-        const orderTotal = parseFloat(order.total_amount) || 0;
-        return total + orderTotal;
-      }, 0);
-
-      // Calculate growth based on order count
-      const growth = calculateGrowth(orders);
-
-      // Estimate customers from unique order data
-      const uniqueCustomers = new Set(
-        orders
-          .map((order: any) =>
-            `${order.customer_first_name} ${order.customer_last_name}`.trim()
-          )
-          .filter(Boolean)
-      );
-      const totalCustomers = uniqueCustomers.size;
-
-      // Get recent orders for display (last 4 orders)
-      const recentOrdersData = orders
-        .sort((a: any, b: any) => {
-          const dateA = new Date(a.created_at);
-          const dateB = new Date(b.created_at);
-          return dateB.getTime() - dateA.getTime();
-        })
-        .slice(0, 4)
-        .map((order: any) => {
-          const orderAmount = parseFloat(order.total_amount) || 0;
-          const customerName =
-            `${order.customer_first_name || ""} ${
-              order.customer_last_name || ""
-            }`.trim() || "Customer";
-
-          return {
-            id: order.order_number,
-            customer: customerName,
-            status: mapOrderStatus(order.order_status),
-            time: formatTimeAgo(order.created_at),
-            amount: `$${orderAmount.toFixed(2)}`,
-          };
-        });
-
-      // Generate real chart data from orders
-      const dailySales = generateRealSalesData(orders);
-      const weeklyRevenue = generateRealRevenueData(orders);
-
-      // Calculate order status breakdown
-      const orderStatusBreakdown = [
-        { label: "Pending", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "pending").length, color: "#f59e0b" },
-        { label: "Confirmed", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "confirmed").length, color: "#10b981" },
-        { label: "Processing", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "processing").length, color: "#3b82f6" },
-        { label: "Out for delivery", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "out-for-delivery").length, color: "#8b5cf6" },
-        { label: "Delivered", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "delivered" || o.order_status?.toLowerCase() === "completed").length, color: "#22c55e" },
-        { label: "Cancelled", value: orders.filter((o: any) => o.order_status?.toLowerCase() === "cancelled").length, color: "#ef4444" },
-      ];
-
-      // Generate top products
-      const topProductsData = generateTopProducts(orders, allItems);
-      const topCustomersData = generateTopCustomers(orders);
-
+      // Map dashboard data to vendor stats
       setVendorStats({
-        totalProducts,
-        totalOrders,
-        revenue,
-        growth,
-        pendingOrders,
-        completedOrders,
-        totalCustomers,
-        averageRating: 4.8,
+        totalProducts: dashboardData.total_items || 0,
+        totalOrders: dashboardData.total_orders || 0,
+        revenue: dashboardData.total_revenue || 0,
+        growth: calculateGrowthFromRevenue(dashboardData.weekly_revenue || 0),
+        pendingOrders: dashboardData.pending_orders || 0,
+        completedOrders: dashboardData.completed_orders || 0,
+        totalCustomers: dashboardData.total_customers || 0,
+        averageRating: 4.8, // Not provided by API, keeping default
       });
 
+      // Map recent orders
+      const recentOrdersData = (dashboardData.recent_orders || []).slice(0, 4).map((order: any) => ({
+        id: order.order_number,
+        customer: `${order.customer?.first_name || ""} ${order.customer?.last_name || ""}`.trim() || "Customer",
+        status: mapOrderStatus(order.order_status),
+        time: formatTimeAgo(order.created_at),
+        amount: `$${parseFloat(String(order.total_amount || 0)).toFixed(2)}`,
+      }));
       setRecentOrders(recentOrdersData);
+
+      // Map daily sales data
+      const dailySales = mapDailySalesData(dashboardData.daily_sales || []);
       setSalesData(dailySales);
+
+      // Map weekly revenue (using weekly_revenue from dashboard)
+      const weeklyRevenue = [
+        { label: "Week 1", value: Math.floor((dashboardData.weekly_revenue || 0) * 0.3) },
+        { label: "Week 2", value: Math.floor((dashboardData.weekly_revenue || 0) * 0.25) },
+        { label: "Week 3", value: Math.floor((dashboardData.weekly_revenue || 0) * 0.25) },
+        { label: "Week 4", value: Math.floor((dashboardData.weekly_revenue || 0) * 0.2) },
+      ];
       setRevenueData(weeklyRevenue);
+
+      // Map order status breakdown
+      const statusCounts = dashboardData.status_counts || {};
+      const orderStatusBreakdown = [
+        { label: "Pending", value: statusCounts.Pending || 0, color: "#f59e0b" },
+        { label: "Confirmed", value: statusCounts.Confirmed || 0, color: "#10b981" },
+        { label: "Processing", value: statusCounts.Processing || 0, color: "#3b82f6" },
+        { label: "Out for delivery", value: statusCounts["Out for delivery"] || 0, color: "#8b5cf6" },
+        { label: "Delivered", value: statusCounts.Delivered || 0, color: "#22c55e" },
+        { label: "Cancelled", value: statusCounts.Cancelled || 0, color: "#ef4444" },
+      ];
       setOrderStatusData(orderStatusBreakdown);
+
+      // Map top selling products from analytics
+      const topProductsData = (analyticsData.top_selling_products || []).slice(0, 4).map((product: any) => ({
+        name: product.item_name || "Unknown Product",
+        price: `$${parseFloat(String(product.avg_price || 0)).toFixed(2)}`,
+        rating: 4.5, // Not provided by API
+        orders: product.orders_count || 0,
+        image: getImageUrl(product.cover_image_url),
+      }));
       setTopProducts(topProductsData);
-      setMostRatedProducts(topProductsData); // Using same as top selling for now
+
+      // Map most rated products (empty array from API, using top selling as fallback)
+      const mostRatedProductsData = (analyticsData.most_rated_products || []).slice(0, 4).map((product: any) => ({
+        name: product.item_name || "Unknown Product",
+        price: `$${parseFloat(String(product.avg_price || 0)).toFixed(2)}`,
+        rating: product.rating || 4.5,
+        orders: product.orders_count || 0,
+        image: getImageUrl(product.cover_image_url),
+      }));
+      setMostRatedProducts(mostRatedProductsData.length > 0 ? mostRatedProductsData : topProductsData);
+
+      // Map top customers from analytics
+      const topCustomersData = (analyticsData.top_customers || []).slice(0, 4).map((customer: any) => ({
+        name: `${customer.first_name || ""} ${customer.last_name || ""}`.trim() || "Customer",
+        phone: customer.phone || "**********",
+        orders: customer.orders_count || 0,
+      }));
       setTopCustomers(topCustomersData);
     } catch (err: any) {
       console.error("❌ Error fetching dashboard data:", err);
@@ -240,20 +218,6 @@ export default function VendorDashboard() {
   };
 
   // Helper functions
-  const getStartOfMonth = (): string => {
-    const date = new Date();
-    return new Date(date.getFullYear(), date.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-  };
-
-  const getEndOfMonth = (): string => {
-    const date = new Date();
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0)
-      .toISOString()
-      .split("T")[0];
-  };
-
   const mapOrderStatus = (status: string): Order["status"] => {
     if (!status) return "pending";
 
@@ -292,24 +256,27 @@ export default function VendorDashboard() {
     }
   };
 
-  const calculateGrowth = (orders: any[]): number => {
-    if (orders.length === 0) return 0;
-    if (orders.length < 5) return 8;
-    if (orders.length < 15) return 15;
-    if (orders.length < 30) return 22;
+  const calculateGrowthFromRevenue = (weeklyRevenue: number): number => {
+    if (weeklyRevenue === 0) return 0;
+    if (weeklyRevenue < 50) return 8;
+    if (weeklyRevenue < 100) return 15;
+    if (weeklyRevenue < 200) return 22;
     return 28;
   };
 
-  const generateRealSalesData = (orders: any[]): SalesData[] => {
+  const mapDailySalesData = (dailySales: Array<{ day_of_week: number; day_name: string; orders_count: number; revenue: number }>): SalesData[] => {
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const dayMap: { [key: string]: string } = {
+      "Monday": "Mon",
+      "Tuesday": "Tue",
+      "Wednesday": "Wed",
+      "Thursday": "Thu",
+      "Friday": "Fri",
+      "Saturday": "Sat",
+      "Sunday": "Sun",
+    };
 
-    if (orders.length === 0) {
-      return days.map((day) => ({
-        label: day,
-        value: Math.floor(Math.random() * 5) + 1,
-      }));
-    }
-
+    // Initialize all days with 0
     const dayCounts: { [key: string]: number } = {
       Mon: 0,
       Tue: 0,
@@ -320,14 +287,10 @@ export default function VendorDashboard() {
       Sun: 0,
     };
 
-    orders.forEach((order) => {
-      try {
-        const orderDate = new Date(order.created_at);
-        const dayName = days[orderDate.getDay()];
-        dayCounts[dayName] = (dayCounts[dayName] || 0) + 1;
-      } catch (error) {
-        // Skip invalid dates
-      }
+    // Map API data to day counts
+    dailySales.forEach((day) => {
+      const dayKey = dayMap[day.day_name] || days[day.day_of_week] || "Mon";
+      dayCounts[dayKey] = day.orders_count || 0;
     });
 
     return days.map((day) => ({
@@ -336,111 +299,9 @@ export default function VendorDashboard() {
     }));
   };
 
-  const generateRealRevenueData = (orders: any[]): SalesData[] => {
-    const weeks = ["Week 1", "Week 2", "Week 3", "Week 4"];
-
-    if (orders.length === 0) {
-      return weeks.map((week) => ({
-        label: week,
-        value: Math.floor(Math.random() * 200) + 50,
-      }));
-    }
-
-    const weekRevenue: number[] = [0, 0, 0, 0];
-
-    orders.forEach((order) => {
-      try {
-        const orderDate = new Date(order.created_at);
-        const week = Math.floor((orderDate.getDate() - 1) / 7);
-        const weekIndex = Math.min(week, 3);
-
-        const orderTotal = parseFloat(order.total_amount) || 0;
-        weekRevenue[weekIndex] += orderTotal;
-      } catch (error) {
-        // Skip invalid dates
-      }
-    });
-
-    return weeks.map((week, index) => ({
-      label: week,
-      value: Math.max(0, weekRevenue[index] || 0),
-    }));
-  };
-
-  const generateTopProducts = (orders: any[], allItems: any[]): any[] => {
-    const productCounts: { [key: string]: { count: number; item: any } } = {};
-
-    orders.forEach((order: any) => {
-      if (order.order_items && Array.isArray(order.order_items)) {
-        order.order_items.forEach((orderItem: any) => {
-          const itemId = orderItem.item_id || orderItem.id;
-          if (itemId) {
-            if (!productCounts[itemId]) {
-              productCounts[itemId] = { count: 0, item: orderItem };
-            }
-            productCounts[itemId].count += orderItem.quantity || 1;
-          }
-        });
-      }
-    });
-
-    const topProductsArray = Object.values(productCounts)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4)
-      .map((p) => {
-        const item = allItems.find((i: any) => i.id === p.item.item_id || i.id === p.item.id) || p.item;
-        return {
-          name: item.item_name || item.name || "Unknown Product",
-          price: `$${parseFloat(item.price || 0).toFixed(2)}`,
-          rating: 4.5,
-          orders: p.count,
-          image: item.cover_image_url || item.image || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
-        };
-      });
-
-    if (topProductsArray.length === 0) {
-      return allItems.slice(0, 4).map((item: any) => ({
-        name: item.item_name || "Product",
-        price: `$${parseFloat(item.price || 0).toFixed(2)}`,
-        rating: 4.5,
-        orders: 0,
-        image: item.cover_image_url || "https://images.pexels.com/photos/315755/pexels-photo-315755.jpeg",
-      }));
-    }
-
-    return topProductsArray;
-  };
-
-  const generateTopCustomers = (orders: any[]): any[] => {
-    const customerOrders: { [key: string]: { name: string; phone: string; count: number } } = {};
-
-    orders.forEach((order: any) => {
-      const customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim() || 'Unknown';
-      const customerPhone = order.customer_phone || '**********';
-      const key = `${customerName}_${customerPhone}`;
-
-      if (!customerOrders[key]) {
-        customerOrders[key] = {
-          name: customerName,
-          phone: customerPhone,
-          count: 0,
-        };
-      }
-      customerOrders[key].count++;
-    });
-
-    return Object.values(customerOrders)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4)
-      .map((c) => ({
-        name: c.name,
-        phone: c.phone,
-        orders: c.count,
-      }));
-  };
 
   const handleAddProduct = () => {
-    navigate("/items/new");
+    navigate("/items");
   };
 
   const handleViewAllOrders = () => {
@@ -511,12 +372,6 @@ export default function VendorDashboard() {
       value: vendorStats.totalCustomers || 0,
       icon: Users,
       color: "blue" as const,
-    },
-    {
-      title: "Average Rating",
-      value: vendorStats.averageRating?.toFixed(1) || "4.8",
-      icon: Star,
-      color: "yellow" as const,
     },
   ];
 
@@ -832,28 +687,7 @@ export default function VendorDashboard() {
               </div>
               <h3 className="text-xl font-bold text-gray-800">Performance Metrics</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200">
-                <div className="flex items-center justify-between mb-2">
-                  <Star className="w-5 h-5 text-green-600" />
-                  <span className="text-3xl font-bold text-green-700">
-                    {vendorStats.averageRating?.toFixed(1) || "4.8"}
-                  </span>
-                </div>
-                <p className="text-sm font-medium text-green-800">Average Rating</p>
-                <div className="flex items-center space-x-1 mt-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-4 h-4 ${
-                        star <= Math.round(vendorStats.averageRating || 4.8)
-                          ? "text-yellow-400 fill-current"
-                          : "text-gray-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
                 <div className="flex items-center justify-between mb-2">
                   <CheckCircle className="w-5 h-5 text-blue-600" />

@@ -197,6 +197,37 @@ export interface ItemSize {
   price: number;
 }
 
+export interface Flavor {
+  id?: number;
+  flavorName: string;
+  description?: string;
+  imageUrl?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  userId?: number;
+}
+
+export interface CreateFlavorRequest {
+  id?: number;
+  flavor_name: string;
+  description?: string;
+  image_url?: string;
+  is_active?: boolean;
+}
+
+export interface FlavorsResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: Flavor[] | null;
+}
+
+export interface FlavorResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: Flavor | null;
+}
+
 export interface Item {
   id: number;
   itemName: string;
@@ -223,6 +254,7 @@ export interface CreateUpdateItemRequest {
   coverImageUrl: string;
   categoryIds: number[];
   addonIds?: number[];
+  flavorIds?: number[];
   sizes?: ItemSize[];
   quantity?: number;
   price?: number;
@@ -389,6 +421,83 @@ export interface UploadImageResponse {
   success: boolean;
   url: string;
   message: string;
+}
+
+// Vendor Dashboard Interfaces
+export interface VendorDashboardData {
+  total_items: number;
+  total_orders: number;
+  total_revenue: number;
+  pending_orders: number;
+  completed_orders: number;
+  total_customers: number;
+  weekly_revenue: number;
+  status_counts: {
+    Pending: number;
+    Confirmed: number;
+    Processing: number;
+    "Out for delivery": number;
+    Delivered: number;
+    Cancelled: number;
+  };
+  daily_sales: Array<{
+    day_of_week: number;
+    day_name: string;
+    orders_count: number;
+    revenue: number;
+  }>;
+  recent_orders: Array<{
+    order_id: number;
+    order_number: string;
+    order_status: string;
+    payment_status: string;
+    total_amount: number;
+    shipping_rate: number;
+    order_notes: string | null;
+    created_at: string;
+    updated_at: string;
+    customer: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string;
+    };
+  }>;
+}
+
+export interface VendorDashboardResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: VendorDashboardData | null;
+}
+
+export interface VendorAnalyticsData {
+  top_selling_products: Array<{
+    item_id: number;
+    item_name: string;
+    cover_image_url: string;
+    background_image_url: string;
+    total_quantity_sold: number;
+    orders_count: number;
+    avg_price: number;
+  }>;
+  most_rated_products: Array<any>;
+  top_customers: Array<{
+    customer_id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+    orders_count: number;
+    total_spent: number;
+  }>;
+}
+
+export interface VendorAnalyticsResponse {
+  errorCode: number;
+  errorMessage: string | null;
+  data: VendorAnalyticsData | null;
 }
 
 // API Error Class
@@ -784,6 +893,51 @@ class ApiService {
     };
   }
 
+  // Flavor Methods
+  async getAllFlavors(): Promise<FlavorsResponse> {
+    return this.makeRequest<FlavorsResponse>('/flavor/getAll', {
+      method: 'GET',
+    });
+  }
+
+  async getFlavorById(id: number): Promise<FlavorResponse> {
+    return this.makeRequest<FlavorResponse>(`/flavor/getById/${id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createOrUpdateFlavor(data: CreateFlavorRequest): Promise<FlavorResponse> {
+    return this.makeRequest<FlavorResponse>('/flavor/createOrUpdate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFlavor(id: number): Promise<{ success: boolean; message: string }> {
+    const response = await this.makeRequest<{ 
+      errorCode: number; 
+      errorMessage: string | null; 
+      data: { message: string; flavor?: any } | null 
+    }>(
+      `/flavor/delete/${id}`,
+      {
+        method: 'DELETE',
+      }
+    );
+
+    if (response.errorCode === 0) {
+      return {
+        success: true,
+        message: response.data?.message || 'Flavor deleted successfully'
+      };
+    }
+
+    return {
+      success: false,
+      message: response.errorMessage || 'Failed to delete flavor'
+    };
+  }
+
   // Cart Methods
   async getCartDetails(): Promise<CartResponse> {
     return this.makeRequest<CartResponse>('/cart/getCartDetails', {
@@ -872,6 +1026,19 @@ class ApiService {
     return this.makeRequest<{ errorCode: number; errorMessage: string | null; data: any }>(`/order/update-status/${orderId}`, {
       method: 'PUT',
       body: JSON.stringify({ order_status: orderStatus }),
+    });
+  }
+
+  // Vendor Dashboard Methods
+  async getVendorDashboard(): Promise<VendorDashboardResponse> {
+    return this.makeRequest<VendorDashboardResponse>('/vendor/dashboard', {
+      method: 'GET',
+    });
+  }
+
+  async getVendorAnalytics(): Promise<VendorAnalyticsResponse> {
+    return this.makeRequest<VendorAnalyticsResponse>('/vendor/analytics', {
+      method: 'GET',
     });
   }
 

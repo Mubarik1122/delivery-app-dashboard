@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   PlusCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ interface SidebarProps {
   onSectionChange: (section: string) => void;
   userRole: "admin" | "vendor";
   onVendorsClick?: () => void;
+  isFood?: boolean; // Show Addons and Flavors only if isFood is true
 }
 
 export default function Sidebar({
@@ -29,6 +31,7 @@ export default function Sidebar({
   onSectionChange,
   userRole,
   onVendorsClick,
+  isFood,
 }: SidebarProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -50,7 +53,7 @@ export default function Sidebar({
 
   const getMenuItems = (): MenuItem[] => {
     const commonItems: MenuItem[] = [
-      { id: "coupon", label: "Coupon", icon: Gift },
+      // Coupon removed - hidden from sidebar
     ];
 
     const adminOnlyItems: MenuItem[] = [
@@ -61,10 +64,14 @@ export default function Sidebar({
 
     const vendorOnlyItems: MenuItem[] = [
       { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { id: "pos", label: "POS", icon: Utensils },
+      // POS removed - hidden from sidebar
       { id: "categories", label: "Categories", icon: Package },
       { id: "items", label: "Items", icon: Utensils },
-      { id: "addons", label: "Addons", icon: PlusCircle },
+      // Addons and Flavors only shown if isFood is true
+      ...(isFood === true ? [
+        { id: "addons", label: "Addons", icon: PlusCircle },
+        { id: "flavors", label: "Flavors", icon: Sparkles },
+      ] : []),
       { id: "all-orders", label: "Orders", icon: ShoppingCart },
     ];
 
